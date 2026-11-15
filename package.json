@@ -1,7 +1,7 @@
 {
   "name": "dsh-workspace-hud",
   "version": "1.4.1",
-  "description": "Pinned workspace HUD for DeepSeek Harness: workspace files, account balance, token usage, and an estimated workspace cost.",
+  "description": "DHS-资源统计弹窗 — pinned workspace resource HUD for DeepSeek Harness: files, balance, tokens, cost.",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -16,13 +16,13 @@
   ],
   "license": "MIT",
   "author": "LiuProMax",
-  "homepage": "https://github.com/LiuProMax/dsh-workspace-hud#readme",
+  "homepage": "https://github.com/LiuProMax/dhs-resource-hud#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LiuProMax/dsh-workspace-hud.git"
+    "url": "git+https://github.com/LiuProMax/dhs-resource-hud.git"
   },
   "bugs": {
-    "url": "https://github.com/LiuProMax/dsh-workspace-hud/issues"
+    "url": "https://github.com/LiuProMax/dhs-resource-hud/issues"
   },
   "type": "module",
   "engines": {
