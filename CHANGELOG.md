@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-16
+
+### Fixed
+
+- The cost pass now reuses the usage snapshot instead of issuing a second
+  `session.list` call, which could collide with the usage poll and leave the cost
+  row stuck at "reading prices". The card now shows the official cost.
+
 ## [1.4.1] - 2026-11-15
 
 ### Added
@@ -94,7 +102,8 @@ All notable changes to this project are documented here. The format follows
 - Account balance with bonus credit, account name, and refresh on focus.
 - Collapse and hide controls, persisted per browser.
 
-[Unreleased]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.2.0...v1.3.0

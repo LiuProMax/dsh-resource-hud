@@ -951,8 +951,8 @@ window.__ModuleLoader__.load({
         const [pricing, setPricing] = useState({ status: 'loading', data: null, meta: null, error: null });
         const pricingRef = useRef(null);
         const pricingMetaRef = useRef({});
-        const rowsRef = useRef(rows);
-        rowsRef.current = rows;
+        const usageSessionsRef = useRef(usageSessions);
+        usageSessionsRef.current = usageSessions;
         const [cost, setCost] = useState(null);
 
         useEffect(() => {
@@ -986,37 +986,10 @@ window.__ModuleLoader__.load({
             }
             if (!data || !alive) return;
 
-            let result;
-            try {
-              result = await ctx.remote.session.list({});
-            } catch {
-              return;
-            }
-            if (!alive) return;
-            if (!result || !result.ok || !Array.isArray(result.value?.items)) return;
-
-            const byId = new Map();
-            for (const item of result.value.items) {
-              if (!item || typeof item.sessionId !== 'string' || item.blank === true) continue;
-              byId.set(item.sessionId, {
-                id: item.sessionId,
-                cwd: item.cwd,
-                totals: item.projections?.values?.tokenUsage,
-                model: item.projections?.values?.modelSelection?.lastUsed?.model,
-              });
-            }
-            for (const row of rowsRef.current) {
-              if (row.blank === true) continue;
-              const live = row.projectionValues?.tokenUsage;
-              const previous = byId.get(row.id);
-              if (live === undefined && previous !== undefined && previous.cwd !== undefined) continue;
-              byId.set(row.id, {
-                id: row.id,
-                cwd: row.cwd ?? previous?.cwd,
-                totals: live ?? previous?.totals,
-                model: row.projectionValues?.modelSelection?.lastUsed?.model ?? previous?.model,
-              });
-            }
+            const members = usageSessionsRef.current.filter(
+              (session) => session.cwd && normPath(session.cwd) === workspaceKey,
+            );
+            if (members.length === 0) return;
 
             const now = Date.now();
             const multiplier = discountMultiplier(data, new Date(now));
@@ -1030,7 +1003,7 @@ window.__ModuleLoader__.load({
             let unpriced = 0;
             const sessions = {};
 
-            for (const session of byId.values()) {
+            for (const session of members) {
               if (!session.cwd || normPath(session.cwd) !== workspaceKey) continue;
               const totals = session.totals;
               if (!totals || typeof totals !== 'object') continue;
