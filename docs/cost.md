@@ -27,15 +27,15 @@ A calibrated table looks like this:
 ```json
 {
   "schema": 1,
-  "currency": "USD",
+  "currency": "CNY",
   "unit": "per_million_tokens",
   "version": "official-2026-11-15",
   "demo": false,
   "utcOffsetMinutes": 480,
   "defaultModel": "deepseek-flash",
   "models": {
-    "deepseek-flash": { "input": 0.15, "output": 0.6, "cacheRead": 0.003, "cacheWrite": 0 },
-    "deepseek-v4-pro": { "input": 0.66, "output": 1.98, "cacheRead": 0.022, "cacheWrite": 0 }
+    "deepseek-flash": { "input": 1, "output": 4, "cacheRead": 0.02, "cacheWrite": 0 },
+    "deepseek-v4-pro": { "input": 4.5, "output": 13.5, "cacheRead": 0.15, "cacheWrite": 0 }
   },
   "windows": [
     { "utcFrom": "09:00", "utcTo": "12:00", "multiplier": 2, "days": [1, 2, 3, 4, 5] },
@@ -43,7 +43,7 @@ A calibrated table looks like this:
   ],
   "holidays": [],
   "checkedAt": "2026-11-15T13:08:14.662Z",
-  "source": "https://api-docs.deepseek.com/quick_start/pricing.md"
+  "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing.md"
 }
 ```
 
@@ -51,7 +51,7 @@ A calibrated table looks like this:
 |---|---|
 | `currency` | Display currency; `CNY` and `USD` get `¥` / `$`, anything else is shown as a code. |
 | `models` | **Off-peak** rates per model for the four buckets; `input` is cache-miss input, `cacheRead` is cache-hit input. |
-| `utcOffsetMinutes` | Wall-clock offset used to evaluate `windows` and `holidays`; the official page is converted to **Beijing time** (`480`). |
+| `utcOffsetMinutes` | Wall-clock offset used to evaluate `windows` and `holidays`. The Chinese page is already in Beijing time; the English page is converted to Beijing time (`480`). |
 | `windows` | Peak windows in `utcOffsetMinutes` wall-clock time, multiplier applied to the base rates, optional `days` (0 = Sunday, 1 = Monday … 6 = Saturday). |
 | `holidays` | Public-holiday dates (in the same wall-clock zone) treated as off-peak for the whole day. The official parser fills the built-in **2026 Chinese** calendar (33 dates); a JSON table can override it. |
 | `demo` | When `true`, the card shows **sample rates**. |
@@ -89,19 +89,21 @@ workspace so amounts in two currencies are never added.
 
 ## Weekly calibration
 
-The default source is the Markdown edition of the official page:
+The default source is the Markdown edition of the **Chinese** official page, which
+prices in **CNY** and states peak hours directly in Beijing time:
 
 ```
-https://api-docs.deepseek.com/quick_start/pricing.md
+https://api-docs.deepseek.com/zh-cn/quick_start/pricing.md
 ```
 
 The host parses:
 
 - the model columns (`deepseek-flash`, `deepseek-v4-pro`);
-- cache-hit, cache-miss, and output prices for `OFF-PEAK` and `PEAK`;
-- the peak windows from the footnote (`01:00 - 04:00` and `06:00 - 10:00` UTC,
-  Monday through Friday, excluding Chinese public holidays), converted to Beijing
-  time as `09:00 - 12:00` and `14:00 - 18:00`;
+- cache-hit, cache-miss, and output prices for `空闲时段` and `高峰时段`
+  (`OFF-PEAK` / `PEAK` on the English page);
+- the peak windows (`9:00 - 12:00` and `14:00 - 18:00`, Monday through Friday,
+  excluding Chinese public holidays); the English page's UTC windows are converted
+  to Beijing time;
 - the built-in **2026 Chinese public holiday** calendar (33 dates) from
   [国务院办公厅关于2026年部分节假日安排的通知](https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm),
   so those days are priced as off-peak.
@@ -110,7 +112,7 @@ The resulting table uses off-peak as the base and the peak/off-peak ratio as the
 window multiplier. A failed fetch or a parse failure keeps the previous table and
 reports the error; the card marks the prices stale.
 
-Override the source (or point it at your own JSON table) in the plugin row config:
+To use the English page (USD) instead, override the source:
 
 ```yaml
 - id: workspace-hud
@@ -138,8 +140,9 @@ Both the official Markdown page and a JSON price table are accepted.
   weekends are not treated as peak days (the official rule is Monday–Friday).
 - The official page may change its layout; a parse failure falls back to the last
   good table.
-- The result is an estimate in the table's currency (USD for the official page);
-  the provider's invoice is authoritative.
+- The result is an estimate in the table's currency (**CNY** for the Chinese page,
+  USD if you point the source at the English page); the provider's invoice is
+  authoritative.
 
 ## Privacy
 

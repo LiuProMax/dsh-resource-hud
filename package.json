@@ -1,6 +1,6 @@
 {
   "name": "dsh-workspace-hud",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "DSH-资源统计弹窗 — pinned workspace resource HUD for DeepSeek Harness: files, balance, tokens, cost.",
   "keywords": [
     "dsh",

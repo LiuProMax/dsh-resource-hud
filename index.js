@@ -44,7 +44,7 @@ export const DEFAULT_PRICING = {
  * Markdown" action and the docs serve the same content at `.md`, which is far
  * easier to parse than the HTML shell.
  */
-const DEFAULT_SOURCE = 'https://api-docs.deepseek.com/quick_start/pricing.md';
+const DEFAULT_SOURCE = 'https://api-docs.deepseek.com/zh-cn/quick_start/pricing.md';
 
 /**
  * Chinese public holidays for 2026, in Beijing time. Source: 国务院办公厅
@@ -131,8 +131,13 @@ export function normalizePricing(raw) {
     if (!Array.isArray(raw.windows)) throw new Error('pricing windows must be an array');
     for (const [index, window] of raw.windows.entries()) {
       if (!window || typeof window !== 'object') throw new Error(`pricing window ${index} must be an object`);
-      const from = parseClock(window.utcFrom, `windows[${index}].utcFrom`);
-      const to = parseClock(window.utcTo, `windows[${index}].utcTo`);
+      const rawFrom = window.utcFrom ?? window.from;
+      const rawTo = window.utcTo ?? window.to;
+      const from = Number.isInteger(rawFrom) ? rawFrom : parseClock(rawFrom, `windows[${index}].utcFrom`);
+      const to = Number.isInteger(rawTo) ? rawTo : parseClock(rawTo, `windows[${index}].utcTo`);
+      if (from < 0 || from > 1439 || to < 0 || to > 1439) {
+        throw new Error(`windows[${index}] times must be within one day`);
+      }
       const multiplier = readRate(window.multiplier, `windows[${index}].multiplier`);
       const days = window.days === undefined ? undefined : readDays(window.days, `windows[${index}].days`);
       windows.push({
@@ -236,9 +241,9 @@ function parsePrice(cell) {
 }
 
 function pricingKind(label) {
-  if (/CACHE HIT/i.test(label)) return 'cacheRead';
-  if (/CACHE MISS/i.test(label)) return 'input';
-  if (/OUTPUT/i.test(label)) return 'output';
+  if (/CACHE HIT|缓存命中/i.test(label)) return 'cacheRead';
+  if (/CACHE MISS|缓存未命中/i.test(label)) return 'input';
+  if (/OUTPUT|输出/i.test(label)) return 'output';
   return null;
 }
 
@@ -255,7 +260,7 @@ export function parseOfficialPricing(markdown) {
   if (typeof markdown !== 'string' || markdown.trim() === '') throw new Error('official pricing is empty');
   const lines = markdown.split(/\r?\n/);
 
-  const header = lines.find((line) => /^\|/.test(line) && /MODEL/i.test(line) && /deepseek-/i.test(line));
+  const header = lines.find((line) => /^\|/.test(line) && /(MODEL|模型)/i.test(line) && /deepseek-/i.test(line));
   if (!header) throw new Error('official pricing header not found');
   const modelNames = splitRow(header)
     .map(modelName)
@@ -264,13 +269,13 @@ export function parseOfficialPricing(markdown) {
 
   const table = {};
   for (const line of lines) {
-    if (!/^\|/.test(line) || !/PRICING/i.test(line)) continue;
-    if (!/OFF-PEAK|PEAK/i.test(line)) continue;
+    if (!/^\|/.test(line) || !/(PRICING|价格)/i.test(line)) continue;
+    if (!/OFF-PEAK|PEAK|空闲时段|高峰时段/i.test(line)) continue;
     const cells = splitRow(line);
     if (cells.length < 4) continue;
     const kind = pricingKind(cells[1]);
     if (!kind) continue;
-    const period = /OFF-PEAK/i.test(cells[2]) ? 'off' : 'peak';
+    const period = /OFF-PEAK|空闲时段/i.test(cells[2]) ? 'off' : 'peak';
     for (const [index, name] of modelNames.entries()) {
       const price = parsePrice(cells[3 + index]);
       if (price === null) continue;
@@ -301,19 +306,19 @@ export function parseOfficialPricing(markdown) {
   }
   if (Object.keys(models).length === 0) throw new Error('official pricing rows not found');
 
-  const peak = /Peak hours are([\s\S]*?)(?:\n\n|$)/i.exec(markdown);
-  const peakText = peak ? peak[1] : '';
-  const ranges = [...peakText.matchAll(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/g)];
+  const peakLine = lines.find((line) => /Peak hours are|北京时间/i.test(line) && /\d{1,2}:\d{2}/.test(line)) ?? '';
+  const ranges = [...peakLine.matchAll(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/g)];
   if (ranges.length === 0) throw new Error('official peak window not found');
-  const weekdaysOnly = /Monday\s+through\s+Friday/i.test(peakText);
-  // The official page states peak hours in UTC. The card evaluates them in
-  // Beijing time (UTC+8), so convert each range: 01:00-04:00 UTC becomes
-  // 09:00-12:00, 06:00-10:00 UTC becomes 14:00-18:00. These windows do not cross
-  // midnight after conversion, so the weekday restriction is unchanged.
+  const weekdaysOnly = /Monday\s+through\s+Friday|周一至周五/i.test(peakLine);
+  // The Chinese page states the windows in Beijing time (09:00-12:00,
+  // 14:00-18:00). The English page states them in UTC (01:00-04:00,
+  // 06:00-10:00), so convert those by +8h. Both end up in Beijing time.
+  const chinese = /北京时间|空闲时段/.test(markdown);
+  const shift = chinese ? 0 : 480;
   const beijingOffset = 480;
   const windows = ranges.map((match) => {
-    const from = (parseClock(match[1].padStart(5, '0'), 'peakFrom') + beijingOffset) % 1440;
-    const to = (parseClock(match[2].padStart(5, '0'), 'peakTo') + beijingOffset) % 1440;
+    const from = (parseClock(match[1].padStart(5, '0'), 'peakFrom') + shift) % 1440;
+    const to = (parseClock(match[2].padStart(5, '0'), 'peakTo') + shift) % 1440;
     return {
       utcFrom: formatClock(from),
       utcTo: formatClock(to),
@@ -322,7 +327,7 @@ export function parseOfficialPricing(markdown) {
     };
   });
 
-  const currency = /[¥￥]/.test(markdown) ? 'CNY' : 'USD';
+  const currency = /[¥￥]|元/.test(markdown) ? 'CNY' : 'USD';
   return {
     schema: 1,
     currency,

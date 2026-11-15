@@ -93,6 +93,37 @@ assert.equal(multiplierAt(official, new Date('2026-10-01T02:00:00Z')), 1, 'Natio
 assert.equal(multiplierAt(official, new Date('2026-05-01T02:00:00Z')), 1, 'Labour Day 10:00 Beijing is off-peak');
 assert.equal(multiplierAt({ ...official, holidays: ['2026-11-16'] }, new Date('2026-11-16T01:30:00Z')), 1, 'holiday in Beijing is off-peak');
 
+/* Chinese page: prices already in CNY and peak hours already in Beijing time. */
+const CHINESE = `
+| 模型 | 模型 | 模型 | deepseek-flash(1) | deepseek-v4-pro |
+| --- | --- | --- | --- | --- |
+| 价格(2) | 百万tokens输入 / （缓存命中） | 空闲时段 | 0.02元 | 0.15元 |
+| 价格(2) | 百万tokens输入 / （缓存命中） | 高峰时段 | 0.04元 | 0.30元 |
+| 价格(2) | 百万tokens输入 / （缓存未命中） | 空闲时段 | 1元 | 4.5元 |
+| 价格(2) | 百万tokens输入 / （缓存未命中） | 高峰时段 | 2元 | 9.0元 |
+| 价格(2) | 百万tokens输出 | 空闲时段 | 4元 | 13.5元 |
+| 价格(2) | 百万tokens输出 | 高峰时段 | 8元 | 27.0元 |
+
+(2) 空闲时段价格为高峰时段价格的一半。北京时间周一至周五（不含中国法定节假日）9:00 - 12:00、14:00 - 18:00 为高峰时段；其余时段，包括周末及中国法定节假日全天均为空闲时段。
+`;
+
+const chineseParsed = parseOfficialPricing(CHINESE);
+assert.equal(chineseParsed.currency, 'CNY');
+assert.equal(chineseParsed.models['deepseek-flash'].input, 1);
+assert.equal(chineseParsed.models['deepseek-flash'].cacheRead, 0.02);
+assert.equal(chineseParsed.models['deepseek-flash'].output, 4);
+assert.equal(chineseParsed.models['deepseek-v4-pro'].input, 4.5);
+assert.equal(chineseParsed.utcOffsetMinutes, 480);
+assert.deepEqual(chineseParsed.windows[0], { utcFrom: '09:00', utcTo: '12:00', multiplier: 2, days: [1, 2, 3, 4, 5] });
+assert.deepEqual(chineseParsed.windows[1], { utcFrom: '14:00', utcTo: '18:00', multiplier: 2, days: [1, 2, 3, 4, 5] });
+
+const chinese = normalizePricing(chineseParsed);
+assert.equal(multiplierAt(chinese, new Date('2026-11-16T01:30:00Z')), 2, 'Chinese page 09:30 Beijing is peak');
+assert.equal(multiplierAt(chinese, new Date('2026-10-01T02:00:00Z')), 1, 'Chinese page holiday is off-peak');
+const reread = normalizePricing(chinese);
+assert.equal(reread.windows[0].from, 540, 'normalized tables can be read back');
+assert.equal(reread.windows[0].to, 720);
+
 assert.throws(() => normalizePricing({
   ...DEFAULT_PRICING,
   windows: [{ utcFrom: '01:00', utcTo: '04:00', multiplier: 2, days: [7] }],

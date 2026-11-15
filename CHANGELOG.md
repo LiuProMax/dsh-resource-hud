@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-11-16
+
+### Changed
+
+- The default price source is now the **Chinese official pricing page**
+  (`zh-cn/quick_start/pricing.md`), so costs are in **CNY**. The parser understands
+  both the Chinese and English tables: Chinese prices are already in yuan and the
+  peak windows are already in Beijing time; the English page is still converted
+  from UTC.
+- A normalized price table written by the host can be read back (`from`/`to`
+  minutes as well as `utcFrom`/`utcTo`), so a calibrated table no longer triggers a
+  recalibration on every request.
+
 ## [1.4.2] - 2026-11-16
 
 ### Fixed
@@ -102,7 +115,8 @@ All notable changes to this project are documented here. The format follows
 - Account balance with bonus credit, account name, and refresh on focus.
 - Collapse and hide controls, persisted per browser.
 
-[Unreleased]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.3...HEAD
+[1.4.3]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.3.0...v1.4.0
