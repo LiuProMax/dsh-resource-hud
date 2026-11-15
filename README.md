@@ -12,15 +12,17 @@ A pinned, draggable overlay for the [DeepSeek Harness](https://github.com/deepse
 
 ![Workspace HUD](assets/preview.png)
 
+<sub>Screenshot: the workspace path, account name, balance, and usage figures are redacted.</sub>
+
 English | [中文](README.zh.md)
 
 ## Features
 
 - **Workspace files** — the current session's working directory, one level at a time (directories expand on demand), with file sizes. Click a file to open it in Harness's right-side preview. Refreshes every 8 seconds.
 - **Account balance** — wallet balances and bonus credit for the signed-in account, with the account name and last update time. Refreshes every 60 seconds and whenever the window regains focus.
-- **Token usage, two scopes** — two side-by-side totals for **account** (every session on this device) and **workspace** (sessions sharing the current `cwd`). Click a total to switch the input / output / cache-read / cache-write breakdown under it.
+- **Token usage, two scopes** — a comparison table with **account** (every session on this device) and **workspace** (sessions sharing the current `cwd`) side by side, and a row for the total, input, output, cache read, and cache write of each scope.
 - **Live numbers** — open sessions are read from their live projections, so the totals grow while a turn streams.
-- **Pinned but out of the way** — drag it anywhere on the title bar, double-click to reset. Position, collapsed state, hidden state, and the selected token scope persist in `localStorage`.
+- **Pinned but out of the way** — drag it anywhere on the title bar, double-click to reset. Position, collapsed state, and hidden state persist in `localStorage`.
 - **Theme-native** — styled only with `--dsw-*` design tokens, so it follows light and dark themes and the host's typography.
 - **Self-contained** — no npm dependencies, no build step, no network calls of its own.
 
@@ -72,7 +74,6 @@ The Desktop profile is owned by the Electron application, so `dsh plugin` refuse
 | Double-click the title bar | Resets to the default top-right position |
 | Click a file row | Opens the file in the right-side preview |
 | Click a directory row | Expands or collapses that directory |
-| Click **账户** / **工作区** | Switches the token breakdown to that scope |
 | Refresh button | Re-reads files, balance, and token usage |
 | Chevron button | Collapses or expands the body |
 | Close button | Hides the card; a small **概览** pill stays in its place |

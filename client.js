@@ -48,9 +48,8 @@ window.__ModuleLoader__.load({
       'tokens.cacheWrite': '缓存写入',
       'tokens.empty': '还没有 Token 消耗记录',
       'tokens.loading': '统计中…',
-      'tokens.sessions': '{count} 个会话',
-      'tokens.workspaceFoot': '当前工作区 · {count} 个会话',
-      'tokens.accountFoot': '本机账户 · {count} 个会话',
+      'tokens.total': '合计',
+      'tokens.foot': '当前工作区 {workspace} 个会话 · 账户 {account} 个会话',
     };
 
     const en = {
@@ -85,9 +84,8 @@ window.__ModuleLoader__.load({
       'tokens.cacheWrite': 'Cache write',
       'tokens.empty': 'No token usage recorded yet',
       'tokens.loading': 'Counting…',
-      'tokens.sessions': '{count} sessions',
-      'tokens.workspaceFoot': 'Current workspace · {count} sessions',
-      'tokens.accountFoot': 'This account on this device · {count} sessions',
+      'tokens.total': 'Total',
+      'tokens.foot': 'Workspace {workspace} sessions · Account {account} sessions',
     };
 
     const CSS = `
@@ -296,67 +294,38 @@ window.__ModuleLoader__.load({
         color: var(--dsw-alias-label-tertiary);
         font: var(--dsw-font-xxxs-11);
       }
-      .wshud-stats {
+      .wshud-usage {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: 12px;
+        row-gap: 2px;
+        align-items: baseline;
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
       }
-      .wshud-stat {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        padding: 5px 8px;
-        border: 0.5px solid var(--dsw-alias-border-l2);
-        border-radius: var(--dsw-radius-md);
-        background: transparent;
-        text-align: left;
-        cursor: pointer;
-        min-width: 0;
-      }
-      .wshud-stat:hover {
-        background: var(--dsw-alias-interactive-bg-hover);
-      }
-      .wshud-stat:focus-visible {
-        outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-        outline-offset: 1px;
-      }
-      .wshud-stat[aria-pressed="true"] {
-        background: var(--dsw-alias-interactive-bg-hover);
-        border-color: var(--dsw-alias-border-l3);
-      }
-      .wshud-statlabel {
-        color: var(--dsw-alias-label-tertiary);
-        font: var(--dsw-font-xxxs-11);
-      }
-      .wshud-stat[aria-pressed="true"] .wshud-statlabel {
-        color: var(--dsw-alias-label-secondary);
-      }
-      .wshud-statvalue {
+      .wshud-usage-label {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: var(--dsw-alias-label-primary);
-        font: var(--dsw-font-base-strong-16);
-        font-variant-numeric: tabular-nums;
-      }
-      .wshud-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 3px 14px;
-        padding-top: 1px;
-      }
-      .wshud-kv {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 8px;
         color: var(--dsw-alias-label-tertiary);
         font: var(--dsw-font-xxxs-11);
       }
-      .wshud-kv b {
+      .wshud-usage-col {
+        text-align: right;
         color: var(--dsw-alias-label-secondary);
         font: var(--dsw-font-xxxs-strong-11);
-        font-variant-numeric: tabular-nums;
+      }
+      .wshud-usage-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: right;
+        color: var(--dsw-alias-label-secondary);
+        font: var(--dsw-font-xxxs-strong-11);
+      }
+      .wshud-usage .wshud-usage-total {
+        color: var(--dsw-alias-label-primary);
+        font: var(--dsw-font-xs-strong-13);
       }
       .wshud-pill {
         position: fixed;
@@ -451,7 +420,7 @@ window.__ModuleLoader__.load({
     }
 
     function readStoredUi() {
-      const fallback = { open: true, hidden: false, x: null, y: null, tokenScope: 'workspace' };
+      const fallback = { open: true, hidden: false, x: null, y: null };
       try {
         const raw = window.localStorage.getItem(STORAGE_KEY);
         if (!raw) return fallback;
@@ -462,7 +431,6 @@ window.__ModuleLoader__.load({
           hidden: parsed.hidden === true,
           x: position.x,
           y: position.y,
-          tokenScope: parsed.tokenScope === 'account' ? 'account' : 'workspace',
         };
       } catch {
         return fallback;
@@ -860,8 +828,6 @@ window.__ModuleLoader__.load({
 
         const accountUsage = useMemo(() => summarizeUsage(usageSessions), [usageSessions]);
 
-        const activeUsage = ui.tokenScope === 'account' ? accountUsage : workspaceUsage;
-
         /* --------------------------------------------------------------- render */
 
         const refresh = () => setRefreshTick((value) => value + 1);
@@ -1012,38 +978,37 @@ window.__ModuleLoader__.load({
             ? h('div', { className: 'wshud-sub' }, t('balance.updated', { time: formatClock(account.data.at) }))
             : null);
 
-        function scopeTile(id, label, summary) {
-          const selected = ui.tokenScope === id;
-          return h('button', {
-            key: id,
-            type: 'button',
-            className: 'wshud-stat',
-            'aria-pressed': selected,
-            title: `${label} · ${t('tokens.sessions', { count: summary.sessions })}`,
-            onClick: () => setUi((previous) => ({ ...previous, tokenScope: id })),
-          },
-          h('span', { className: 'wshud-statlabel' }, label),
-          h('span', { className: 'wshud-statvalue' }, formatTokens(summary.total)));
+        const usageCells = [
+          h('span', { key: 'usage-h0', className: 'wshud-usage-label' }),
+          h('span', { key: 'usage-h1', className: 'wshud-usage-col' }, t('tokens.account')),
+          h('span', { key: 'usage-h2', className: 'wshud-usage-col' }, t('tokens.workspace')),
+          h('span', { key: 'usage-t0', className: 'wshud-usage-label' }, t('tokens.total')),
+          h('b', { key: 'usage-t1', className: 'wshud-usage-value wshud-usage-total' }, formatTokens(accountUsage.total)),
+          h('b', { key: 'usage-t2', className: 'wshud-usage-value wshud-usage-total' }, formatTokens(workspaceUsage.total)),
+        ];
+        for (const [labelKey, field] of [
+          ['tokens.input', 'input'],
+          ['tokens.output', 'output'],
+          ['tokens.cacheRead', 'cacheRead'],
+          ['tokens.cacheWrite', 'cacheWrite'],
+        ]) {
+          usageCells.push(h('span', { key: `usage-${field}-l`, className: 'wshud-usage-label' }, t(labelKey)));
+          usageCells.push(h('b', { key: `usage-${field}-a`, className: 'wshud-usage-value' }, formatTokens(accountUsage[field])));
+          usageCells.push(h('b', { key: `usage-${field}-w`, className: 'wshud-usage-value' }, formatTokens(workspaceUsage[field])));
         }
 
         const tokensSection = h('section', { className: 'wshud-sec', 'aria-label': t('tokens.title') },
           h('div', { className: 'wshud-sechead' },
             h('span', null, t('tokens.title')),
             h('span', null, usage.status === 'loading' ? t('tokens.loading') : '')),
-          h('div', { className: 'wshud-stats' },
-            scopeTile('account', t('tokens.account'), accountUsage),
-            scopeTile('workspace', t('tokens.workspace'), workspaceUsage)),
-          activeUsage.total > 0
-            ? h('div', { className: 'wshud-grid' },
-              h('div', { className: 'wshud-kv' }, t('tokens.input'), h('b', null, formatTokens(activeUsage.input))),
-              h('div', { className: 'wshud-kv' }, t('tokens.output'), h('b', null, formatTokens(activeUsage.output))),
-              h('div', { className: 'wshud-kv' }, t('tokens.cacheRead'), h('b', null, formatTokens(activeUsage.cacheRead))),
-              h('div', { className: 'wshud-kv' }, t('tokens.cacheWrite'), h('b', null, formatTokens(activeUsage.cacheWrite))))
+          accountUsage.total + workspaceUsage.total > 0
+            ? h('div', { className: 'wshud-usage' }, ...usageCells)
             : h('div', { className: 'wshud-note' }, t('tokens.empty')),
           h('div', { className: 'wshud-sub' },
-            ui.tokenScope === 'account'
-              ? t('tokens.accountFoot', { count: accountUsage.sessions })
-              : t('tokens.workspaceFoot', { count: workspaceUsage.sessions })));
+            t('tokens.foot', {
+              workspace: workspaceUsage.sessions,
+              account: accountUsage.sessions,
+            })));
 
         if (ui.hidden) {
           const pillStyle = ui.x === null

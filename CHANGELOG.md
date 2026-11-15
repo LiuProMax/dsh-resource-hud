@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-15
+
+### Changed
+
+- Token usage is now a comparison table: `合计`, input, output, cache read, and
+  cache write for **account** and **workspace** are shown side by side instead
+  of switching a shared breakdown with a scope toggle.
+
 ## [1.1.0] - 2026-11-15
 
 ### Added
@@ -33,6 +41,7 @@ All notable changes to this project are documented here. The format follows
 - Account balance with bonus credit, account name, and refresh on focus.
 - Collapse and hide controls, persisted per browser.
 
-[Unreleased]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/LiuProMax/dsh-workspace-hud/releases/tag/v1.0.0

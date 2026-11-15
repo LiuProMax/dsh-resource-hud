@@ -119,6 +119,11 @@ The card then:
 3. sums twice: every entry for **account**, entries whose `cwd` matches the
    current workspace for **workspace**.
 
+Both scopes are rendered as a three-column comparison table — metric label,
+account value, workspace value — with rows for `合计` (total), input, output,
+cache read, and cache write. The two breakdowns are always visible; there is no
+scope toggle.
+
 The list read runs only while the card is expanded and visible, every 60 seconds,
 and immediately after a refresh or re-expansion.
 
