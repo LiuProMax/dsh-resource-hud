@@ -77,6 +77,8 @@ assert.equal(parsed.models['deepseek-flash'].output, 0.6);
 assert.equal(parsed.models['deepseek-flash'].cacheRead, 0.003);
 assert.equal(parsed.models['deepseek-v4-pro'].input, 0.66);
 assert.equal(parsed.utcOffsetMinutes, 480);
+assert.equal(parsed.holidays.length, 33);
+assert.ok(parsed.holidays.includes('2026-10-01'), 'National Day is a public holiday');
 assert.equal(parsed.windows.length, 2);
 assert.deepEqual(parsed.windows[0], { utcFrom: '09:00', utcTo: '12:00', multiplier: 2, days: [1, 2, 3, 4, 5] });
 assert.deepEqual(parsed.windows[1], { utcFrom: '14:00', utcTo: '18:00', multiplier: 2, days: [1, 2, 3, 4, 5] });
@@ -86,6 +88,9 @@ assert.equal(multiplierAt(official, new Date('2026-11-16T01:30:00Z')), 2, 'Monda
 assert.equal(multiplierAt(official, new Date('2026-11-16T04:30:00Z')), 1, 'Monday 12:30 Beijing');
 assert.equal(multiplierAt(official, new Date('2026-11-16T06:30:00Z')), 2, 'Monday 14:30 Beijing');
 assert.equal(multiplierAt(official, new Date('2026-11-21T01:30:00Z')), 1, 'Saturday 09:30 Beijing is off-peak');
+assert.equal(multiplierAt(official, new Date('2026-09-30T02:00:00Z')), 2, 'Wednesday before National Day is still peak');
+assert.equal(multiplierAt(official, new Date('2026-10-01T02:00:00Z')), 1, 'National Day 10:00 Beijing is off-peak');
+assert.equal(multiplierAt(official, new Date('2026-05-01T02:00:00Z')), 1, 'Labour Day 10:00 Beijing is off-peak');
 assert.equal(multiplierAt({ ...official, holidays: ['2026-11-16'] }, new Date('2026-11-16T01:30:00Z')), 1, 'holiday in Beijing is off-peak');
 
 assert.throws(() => normalizePricing({

@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-15
+
+### Added
+
+- A built-in **2026 Chinese public holiday** calendar (33 dates, Beijing time) so
+  peak windows are evaluated as off-peak on holidays, matching the official page's
+  "excluding Chinese public holidays" rule. Source:
+  [国务院办公厅关于2026年部分节假日安排的通知](https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm).
+- `holidays` is part of the calibrated table; a JSON source can override it for
+  other years or regions.
+
 ## [1.4.0] - 2026-11-15
 
 ### Changed
@@ -78,7 +89,8 @@ All notable changes to this project are documented here. The format follows
 - Account balance with bonus credit, account name, and refresh on focus.
 - Collapse and hide controls, persisted per browser.
 
-[Unreleased]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.1.0...v1.2.0

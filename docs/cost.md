@@ -53,7 +53,7 @@ A calibrated table looks like this:
 | `models` | **Off-peak** rates per model for the four buckets; `input` is cache-miss input, `cacheRead` is cache-hit input. |
 | `utcOffsetMinutes` | Wall-clock offset used to evaluate `windows` and `holidays`; the official page is converted to **Beijing time** (`480`). |
 | `windows` | Peak windows in `utcOffsetMinutes` wall-clock time, multiplier applied to the base rates, optional `days` (0 = Sunday, 1 = Monday … 6 = Saturday). |
-| `holidays` | Optional `YYYY-MM-DD` dates (in the same wall-clock zone) treated as off-peak for the whole day. |
+| `holidays` | Public-holiday dates (in the same wall-clock zone) treated as off-peak for the whole day. The official parser fills the built-in **2026 Chinese** calendar (33 dates); a JSON table can override it. |
 | `demo` | When `true`, the card shows **sample rates**. |
 | `checkedAt` / `source` | Written by the host after a successful calibration. |
 
@@ -101,7 +101,10 @@ The host parses:
 - cache-hit, cache-miss, and output prices for `OFF-PEAK` and `PEAK`;
 - the peak windows from the footnote (`01:00 - 04:00` and `06:00 - 10:00` UTC,
   Monday through Friday, excluding Chinese public holidays), converted to Beijing
-  time as `09:00 - 12:00` and `14:00 - 18:00`.
+  time as `09:00 - 12:00` and `14:00 - 18:00`;
+- the built-in **2026 Chinese public holiday** calendar (33 dates) from
+  [国务院办公厅关于2026年部分节假日安排的通知](https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm),
+  so those days are priced as off-peak.
 
 The resulting table uses off-peak as the base and the peak/off-peak ratio as the
 window multiplier. A failed fetch or a parse failure keeps the previous table and
@@ -129,10 +132,10 @@ Both the official Markdown page and a JSON price table are accepted.
 - The token projection has no per-model split; a session that switched models
   mid-way is priced with the last model's rates.
 - Subagent sessions are not returned by `session.list`, so their usage is missing.
-- Peak windows are evaluated in **Beijing time** (UTC+8), Monday–Friday.
-  `holidays` defaults to empty, so Chinese public holidays are **not**
-  automatically excluded; add dates (in Beijing time) to the table if you need
-  that.
+- Peak windows are evaluated in **Beijing time** (UTC+8), Monday–Friday. The
+  built-in 2026 Chinese public holiday calendar makes those days off-peak; update
+  the list for a new year, or override `holidays` in a JSON table. Make-up working
+  weekends are not treated as peak days (the official rule is Monday–Friday).
 - The official page may change its layout; a parse failure falls back to the last
   good table.
 - The result is an estimate in the table's currency (USD for the official page);

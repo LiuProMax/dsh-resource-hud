@@ -1,6 +1,6 @@
 {
   "name": "dsh-workspace-hud",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Pinned workspace HUD for DeepSeek Harness: workspace files, account balance, token usage, and an estimated workspace cost.",
   "keywords": [
     "dsh",

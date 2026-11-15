@@ -46,6 +46,26 @@ export const DEFAULT_PRICING = {
  */
 const DEFAULT_SOURCE = 'https://api-docs.deepseek.com/quick_start/pricing.md';
 
+/**
+ * Chinese public holidays for 2026, in Beijing time. Source: 国务院办公厅
+ * 《关于2026年部分节假日安排的通知》(国办发明电〔2025〕7号),
+ * https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm
+ *
+ * The official pricing page excludes these days from peak hours. Weekend days
+ * inside a holiday period are included for completeness; they are already
+ * off-peak. Make-up working Saturdays/Sundays are not treated as peak days,
+ * because the official rule is "Monday through Friday".
+ */
+export const CHINA_HOLIDAYS = Object.freeze([
+  '2026-01-01', '2026-01-02', '2026-01-03',
+  '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23',
+  '2026-04-04', '2026-04-05', '2026-04-06',
+  '2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04', '2026-05-05',
+  '2026-06-19', '2026-06-20', '2026-06-21',
+  '2026-09-25', '2026-09-26', '2026-09-27',
+  '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07',
+]);
+
 function parseClock(value, field) {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(typeof value === 'string' ? value : '');
   if (!match) throw new Error(`${field} must be HH:MM`);
@@ -313,7 +333,7 @@ export function parseOfficialPricing(markdown) {
     defaultModel: models['deepseek-flash'] ? 'deepseek-flash' : Object.keys(models)[0],
     models,
     windows,
-    holidays: [],
+    holidays: [...CHINA_HOLIDAYS],
     utcOffsetMinutes: beijingOffset,
   };
 }
