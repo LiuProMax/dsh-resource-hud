@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-15
+
+### Changed
+
+- Cost passes now fetch the price table **before** every increment calculation
+  (60 s), so each delta is priced with the rates and the time coefficient in effect
+  at that moment instead of a table cached for five minutes.
+- The price table is calibrated from the **official DeepSeek pricing page**
+  (`https://api-docs.deepseek.com/quick_start/pricing.md`) once a week. The host
+  parses the model rates, the peak/off-peak ratio, and the peak windows (01:00–04:00
+  and 06:00–10:00 UTC, Monday–Friday), converts them to **Beijing time**
+  (09:00–12:00 and 14:00–18:00), and stores the off-peak rates as the base plus
+  weekday-limited peak windows.
+- The schema gained `utcOffsetMinutes`, `windows[].days`, and `holidays`; the client's
+  multiplier respects all three. A demo table from a different source triggers an
+  immediate calibration, and a currency change starts a fresh ledger.
+
 ## [1.3.0] - 2026-11-15
 
 ### Added
@@ -61,7 +78,8 @@ All notable changes to this project are documented here. The format follows
 - Account balance with bonus credit, account name, and refresh on focus.
 - Collapse and hide controls, persisted per browser.
 
-[Unreleased]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/LiuProMax/dsh-workspace-hud/compare/v1.0.0...v1.1.0

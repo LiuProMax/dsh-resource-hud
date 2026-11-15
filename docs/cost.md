@@ -1,104 +1,125 @@
 # Workspace cost
 
 The card shows an estimated **workspace cost** next to the token counters. It is an
-estimate, not an invoice: the number comes from a local price table multiplied by
-the token increments the card observes.
+estimate, not an invoice: the number comes from a price table multiplied by the
+token increments the card observes.
+
+The price table is calibrated from the **official DeepSeek pricing page** once a
+week. The page publishes peak and off-peak rates per model; the plugin stores the
+off-peak rates as the base and applies a peak multiplier inside the published
+peak windows.
 
 ## Where the price table lives
 
-On first run the host half writes a table to:
+The host half keeps a local copy at:
 
 ```
 $DSH_HOME/workspace-hud/pricing.json      # default: ~/.dsh/workspace-hud/pricing.json
 ```
 
-It is a plain JSON file; edit it with any editor. The bundled table is marked
-`"demo": true` and uses sample rates, so the card labels it **sample rates** until
-you replace it.
+On first run, or whenever the copy is older than `refreshDays` (default **7**), the
+host fetches the official page, parses it, and overwrites the file atomically
+(keeping a `.bak`). The bundled fallback table is marked `"demo": true` and is
+replaced by the first successful calibration.
+
+A calibrated table looks like this:
 
 ```json
 {
   "schema": 1,
-  "currency": "CNY",
+  "currency": "USD",
   "unit": "per_million_tokens",
-  "version": "2026-11-15-demo",
-  "demo": true,
+  "version": "official-2026-11-15",
+  "demo": false,
+  "utcOffsetMinutes": 480,
   "defaultModel": "deepseek-flash",
   "models": {
-    "deepseek-flash": { "input": 1, "output": 4, "cacheRead": 0.1, "cacheWrite": 0 }
+    "deepseek-flash": { "input": 0.15, "output": 0.6, "cacheRead": 0.003, "cacheWrite": 0 },
+    "deepseek-v4-pro": { "input": 0.66, "output": 1.98, "cacheRead": 0.022, "cacheWrite": 0 }
   },
   "windows": [
-    { "utcFrom": "16:30", "utcTo": "00:30", "multiplier": 0.5 }
-  ]
+    { "utcFrom": "09:00", "utcTo": "12:00", "multiplier": 2, "days": [1, 2, 3, 4, 5] },
+    { "utcFrom": "14:00", "utcTo": "18:00", "multiplier": 2, "days": [1, 2, 3, 4, 5] }
+  ],
+  "holidays": [],
+  "checkedAt": "2026-11-15T13:08:14.662Z",
+  "source": "https://api-docs.deepseek.com/quick_start/pricing.md"
 }
 ```
 
 | Field | Meaning |
 |---|---|
 | `currency` | Display currency; `CNY` and `USD` get `¥` / `$`, anything else is shown as a code. |
-| `unit` | Must be `per_million_tokens`; all rates are in that unit. |
-| `models` | Per-model rates for the four token buckets. |
-| `defaultModel` | Model used when a session has no `modelSelection` yet. |
-| `windows` | Optional UTC time windows with a multiplier (for off-peak pricing). |
+| `models` | **Off-peak** rates per model for the four buckets; `input` is cache-miss input, `cacheRead` is cache-hit input. |
+| `utcOffsetMinutes` | Wall-clock offset used to evaluate `windows` and `holidays`; the official page is converted to **Beijing time** (`480`). |
+| `windows` | Peak windows in `utcOffsetMinutes` wall-clock time, multiplier applied to the base rates, optional `days` (0 = Sunday, 1 = Monday … 6 = Saturday). |
+| `holidays` | Optional `YYYY-MM-DD` dates (in the same wall-clock zone) treated as off-peak for the whole day. |
 | `demo` | When `true`, the card shows **sample rates**. |
-| `checkedAt` | Written by the host after a successful calibration; do not edit. |
-| `source` | The URL the table came from; written by the host. |
+| `checkedAt` / `source` | Written by the host after a successful calibration. |
 
-Rates must be non-negative numbers. `cacheWrite` is often free; put `0` if your
-provider does not charge it separately.
+The official page publishes **off-peak = half of peak**, so the base is off-peak
+and the peak windows carry `multiplier: 2`. The official page states its peak
+hours in UTC (01:00–04:00 and 06:00–10:00); the parser converts them to **Beijing
+time** (09:00–12:00 and 14:00–18:00) and sets `utcOffsetMinutes: 480`.
+`cacheWrite` is not charged separately on the official page and is stored as `0`.
 
-## Weekly calibration
+## Every increment fetches the table first
 
-The host answers a read-only route:
+Every `USAGE_REFRESH_MS` (60 s) the cost pass does this in order:
 
-```
-GET /api/workspace-hud/pricing
-```
-
-On every read it checks `checkedAt`. If the table is missing or older than
-`refreshDays` (default **7**), the host fetches `pricingSourceUrl`, validates the
-result, and only then overwrites the local file. A failed fetch or an invalid
-payload keeps the previous table and reports the error; the card keeps using the
-old rates and marks them stale.
-
-The default source is:
-
-```
-https://raw.githubusercontent.com/LiuProMax/dsh-workspace-hud/main/pricing.json
-```
-
-Override it in the plugin row config when you host your own table:
-
-```yaml
-- id: workspace-hud
-  name: dsh-workspace-hud
-  config:
-    pricingSourceUrl: https://example.com/workspace-hud/pricing.json
-    refreshDays: 7
-    requestTimeoutMs: 15000
-    # pricingFile: /absolute/path/to/pricing.json
-```
-
-## How an increment is priced
-
-1. Every `USAGE_REFRESH_MS` (60 s) the card reads `session.list` and keeps the four
-   token buckets per session.
-2. For each session in the current workspace it subtracts the previous buckets
-   stored in the ledger, giving the increment since the last pass.
-3. The increment is priced with the rates **in effect at that moment**: the
-   session's `modelSelection.lastUsed.model` (falling back to `defaultModel`),
-   the table's rates, and the off-peak multiplier for the current UTC time.
+1. `GET /api/workspace-hud/pricing` — the host reads the local file **on every
+   request** and calibrates it if it is stale or still the demo fallback.
+2. `session.list` — the current per-session buckets.
+3. The increment since the last baseline is priced with the rates **and the time
+   coefficient in effect at that moment** (the session's model, the table's rates,
+   and the peak/off-peak multiplier for the current **Beijing** weekday/time).
 4. The cost is added to the workspace ledger in
    `localStorage["dsh.workspace-hud.cost.v1"]`.
-
-The first pass for a workspace seeds the ledger by pricing its **existing totals**
-at today's rates, then records the buckets as the new baseline.
 
 Formula:
 
 ```
 cost = Σ buckets × rate / 1_000_000 × multiplier
 ```
+
+The first pass for a workspace seeds the ledger by pricing its **existing totals**
+at the current rates, then records the buckets as the new baseline. A currency
+change (for example demo CNY → official USD) starts a fresh ledger for that
+workspace so amounts in two currencies are never added.
+
+## Weekly calibration
+
+The default source is the Markdown edition of the official page:
+
+```
+https://api-docs.deepseek.com/quick_start/pricing.md
+```
+
+The host parses:
+
+- the model columns (`deepseek-flash`, `deepseek-v4-pro`);
+- cache-hit, cache-miss, and output prices for `OFF-PEAK` and `PEAK`;
+- the peak windows from the footnote (`01:00 - 04:00` and `06:00 - 10:00` UTC,
+  Monday through Friday, excluding Chinese public holidays), converted to Beijing
+  time as `09:00 - 12:00` and `14:00 - 18:00`.
+
+The resulting table uses off-peak as the base and the peak/off-peak ratio as the
+window multiplier. A failed fetch or a parse failure keeps the previous table and
+reports the error; the card marks the prices stale.
+
+Override the source (or point it at your own JSON table) in the plugin row config:
+
+```yaml
+- id: workspace-hud
+  name: dsh-workspace-hud
+  config:
+    pricingSourceUrl: https://api-docs.deepseek.com/quick_start/pricing.md
+    refreshDays: 7
+    requestTimeoutMs: 15000
+    # pricingFile: /absolute/path/to/pricing.json
+```
+
+Both the official Markdown page and a JSON price table are accepted.
 
 ## Accuracy
 
@@ -108,11 +129,18 @@ cost = Σ buckets × rate / 1_000_000 × multiplier
 - The token projection has no per-model split; a session that switched models
   mid-way is priced with the last model's rates.
 - Subagent sessions are not returned by `session.list`, so their usage is missing.
-- Off-peak windows are UTC and apply to the whole increment.
-- The result is an estimate; the provider's invoice is authoritative.
+- Peak windows are evaluated in **Beijing time** (UTC+8), Monday–Friday.
+  `holidays` defaults to empty, so Chinese public holidays are **not**
+  automatically excluded; add dates (in Beijing time) to the table if you need
+  that.
+- The official page may change its layout; a parse failure falls back to the last
+  good table.
+- The result is an estimate in the table's currency (USD for the official page);
+  the provider's invoice is authoritative.
 
 ## Privacy
 
-The price table is public data. The route returns only the table, its version,
-and the calibration time; it never returns the account, sessions, file paths, or
-the absolute location of the local file.
+The price table is public data. The calibration request sends no account, session,
+or token data to the official page. The local route returns only the table, its
+version, and the calibration time; it never returns the account, sessions, file
+paths, or the absolute location of the local file.

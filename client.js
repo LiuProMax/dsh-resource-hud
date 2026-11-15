@@ -12,7 +12,6 @@ window.__ModuleLoader__.load({
     const FILES_REFRESH_MS = 8000;
     const ACCOUNT_REFRESH_MS = 60000;
     const USAGE_REFRESH_MS = 60000;
-    const PRICING_REFRESH_MS = 300000;
     const PRICING_ROUTE = '/api/workspace-hud/pricing';
     const COST_KEY = 'dsh.workspace-hud.cost.v1';
     const MAX_ROWS_PER_LEVEL = 80;
@@ -57,6 +56,7 @@ window.__ModuleLoader__.load({
       'cost.loading': '读取价格…',
       'cost.unavailable': '价格不可用',
       'cost.demo': '示例价',
+      'cost.official': '官方价',
       'cost.checked': '校准 {time}',
       'cost.never': '未校准',
       'cost.stale': '价格可能过期',
@@ -102,6 +102,7 @@ window.__ModuleLoader__.load({
       'cost.loading': 'Reading prices…',
       'cost.unavailable': 'Prices unavailable',
       'cost.demo': 'sample rates',
+      'cost.official': 'official rates',
       'cost.checked': 'checked {time}',
       'cost.never': 'not calibrated',
       'cost.stale': 'prices may be stale',
@@ -468,11 +469,18 @@ window.__ModuleLoader__.load({
       return units * (multiplier || 1);
     }
 
-    /** The off-peak multiplier in effect at `date`; windows in the table are UTC. */
+    /** The multiplier in effect at `date`; window times are wall-clock in the table's offset. */
     function discountMultiplier(pricing, date) {
-      const minutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+      const offset = pricing?.utcOffsetMinutes ?? 0;
+      const shifted = new Date(date.getTime() + offset * 60000);
+      const key = shifted.toISOString().slice(0, 10);
+      if (pricing?.holidays?.includes(key)) return 1;
+
+      const minutes = shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+      const weekday = shifted.getUTCDay();
       let multiplier = 1;
       for (const window of pricing?.windows ?? []) {
+        if (window.days && !window.days.includes(weekday)) continue;
         const active = window.overnight
           ? minutes >= window.from || minutes < window.to
           : minutes >= window.from && minutes < window.to;
@@ -934,134 +942,155 @@ window.__ModuleLoader__.load({
         /* ------------------------------------------------------------- pricing */
 
         /**
-         * The local price table lives on the host (`~/.dsh/workspace-hud/pricing.json`).
-         * The host calibrates it from the network when it is older than a week and
-         * answers this read-only route with the table plus its calibration state.
+         * Every incremental cost pass fetches the price table *first*, then the
+         * session snapshot, so the delta is priced with the rates and the
+         * time coefficient in effect at that moment. The host reads its local
+         * `pricing.json` on every request and calibrates the official page once a
+         * week.
          */
         const [pricing, setPricing] = useState({ status: 'loading', data: null, meta: null, error: null });
+        const pricingRef = useRef(null);
+        const pricingMetaRef = useRef({});
+        const rowsRef = useRef(rows);
+        rowsRef.current = rows;
+        const [cost, setCost] = useState(null);
 
         useEffect(() => {
           if (!ui.open || ui.hidden) return undefined;
+          if (!workspaceKey) {
+            setCost(null);
+            return undefined;
+          }
           let alive = true;
-          const controller = new AbortController();
 
-          const load = async () => {
+          const tick = async () => {
+            let data = null;
+            let pricingError = null;
             try {
-              const response = await fetch(PRICING_ROUTE, { signal: controller.signal, cache: 'no-store' });
+              const response = await fetch(PRICING_ROUTE, { cache: 'no-store' });
               if (!response.ok) throw new Error(`HTTP ${response.status}`);
               const body = await response.json();
               if (!body || body.ok === false || !body.pricing) throw new Error(body?.error || 'pricing unavailable');
-              if (!alive) return;
-              setPricing({ status: 'ready', data: body.pricing, meta: body.meta ?? {}, error: null });
+              data = body.pricing;
+              pricingRef.current = data;
+              pricingMetaRef.current = body.meta ?? {};
+              if (alive) setPricing({ status: 'ready', data, meta: body.meta ?? {}, error: null });
             } catch (error) {
-              if (!alive) return;
-              setPricing((previous) => previous.data
-                ? { ...previous, status: 'stale', error: String(error?.message ?? error) }
-                : { status: 'error', data: null, meta: null, error: String(error?.message ?? error) });
+              pricingError = String(error?.message ?? error);
+              data = pricingRef.current;
+              if (alive) {
+                setPricing(data
+                  ? { status: 'stale', data, meta: pricingMetaRef.current, error: pricingError }
+                  : { status: 'error', data: null, meta: null, error: pricingError });
+              }
             }
+            if (!data || !alive) return;
+
+            let result;
+            try {
+              result = await ctx.remote.session.list({});
+            } catch {
+              return;
+            }
+            if (!alive) return;
+            if (!result || !result.ok || !Array.isArray(result.value?.items)) return;
+
+            const byId = new Map();
+            for (const item of result.value.items) {
+              if (!item || typeof item.sessionId !== 'string' || item.blank === true) continue;
+              byId.set(item.sessionId, {
+                id: item.sessionId,
+                cwd: item.cwd,
+                totals: item.projections?.values?.tokenUsage,
+                model: item.projections?.values?.modelSelection?.lastUsed?.model,
+              });
+            }
+            for (const row of rowsRef.current) {
+              if (row.blank === true) continue;
+              const live = row.projectionValues?.tokenUsage;
+              const previous = byId.get(row.id);
+              if (live === undefined && previous !== undefined && previous.cwd !== undefined) continue;
+              byId.set(row.id, {
+                id: row.id,
+                cwd: row.cwd ?? previous?.cwd,
+                totals: live ?? previous?.totals,
+                model: row.projectionValues?.modelSelection?.lastUsed?.model ?? previous?.model,
+              });
+            }
+
+            const now = Date.now();
+            const multiplier = discountMultiplier(data, new Date(now));
+            const ledger = readCostLedger();
+            // A currency change means the table changed identity (demo CNY -> official USD);
+            // start a fresh ledger so amounts from two currencies are never added.
+            let entry = ledger.workspaces[workspaceKey];
+            if (entry && entry.currency !== data.currency) entry = undefined;
+            const previousSessions = entry?.sessions ?? {};
+            let total = Number.isFinite(Number(entry?.cost)) ? Number(entry.cost) : 0;
+            let unpriced = 0;
+            const sessions = {};
+
+            for (const session of byId.values()) {
+              if (!session.cwd || normPath(session.cwd) !== workspaceKey) continue;
+              const totals = session.totals;
+              if (!totals || typeof totals !== 'object') continue;
+              const buckets = {
+                input: tokenCount(totals.uncachedInputTokens),
+                output: tokenCount(totals.outputTokens),
+                cacheRead: tokenCount(totals.cacheReadTokens),
+                cacheWrite: tokenCount(totals.cacheWriteTokens),
+              };
+              const previous = previousSessions[session.id] ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+              const delta = {
+                input: Math.max(0, buckets.input - previous.input),
+                output: Math.max(0, buckets.output - previous.output),
+                cacheRead: Math.max(0, buckets.cacheRead - previous.cacheRead),
+                cacheWrite: Math.max(0, buckets.cacheWrite - previous.cacheWrite),
+              };
+              const model = session.model || data.defaultModel;
+              const rates = data.models?.[model] ?? (data.defaultModel ? data.models?.[data.defaultModel] : undefined);
+              const deltaTotal = delta.input + delta.output + delta.cacheRead + delta.cacheWrite;
+              if (rates) {
+                total += costOfTokens(delta, rates, multiplier);
+              } else if (deltaTotal > 0) {
+                unpriced += deltaTotal;
+              }
+              sessions[session.id] = buckets;
+            }
+
+            const next = {
+              currency: data.currency,
+              cost: total,
+              checkedAt: data.checkedAt ?? null,
+              demo: data.demo === true,
+              seededAt: entry?.seededAt ?? now,
+              updatedAt: now,
+              sessions,
+            };
+            ledger.workspaces[workspaceKey] = next;
+            writeCostLedger(ledger);
+            if (!alive) return;
+            setCost({
+              status: 'ready',
+              currency: next.currency,
+              cost: next.cost,
+              checkedAt: next.checkedAt,
+              demo: next.demo,
+              unpriced,
+              meta: pricingMetaRef.current,
+              error: pricingError,
+            });
           };
 
-          load();
-          const timer = window.setInterval(load, PRICING_REFRESH_MS);
+          tick();
+          const timer = window.setInterval(() => {
+            if (!document.hidden) tick();
+          }, USAGE_REFRESH_MS);
           return () => {
             alive = false;
-            controller.abort();
             window.clearInterval(timer);
           };
-        }, [refreshTick, ui.open, ui.hidden]);
-
-        const [cost, setCost] = useState(null);
-
-        /**
-         * Price the *increment* of every bucket since the last pass with the price
-         * in effect right now, and add it to the workspace ledger. Seeding a new
-         * workspace prices its existing totals at today's rates, which is why the
-         * card calls the number an estimate.
-         */
-        useEffect(() => {
-          if (!workspaceKey) {
-            setCost(null);
-            return;
-          }
-
-          const ledger = readCostLedger();
-          const entry = ledger.workspaces[workspaceKey];
-
-          if (!pricing.data) {
-            if (entry) {
-              setCost({
-                status: 'cached',
-                currency: entry.currency,
-                cost: entry.cost,
-                checkedAt: entry.checkedAt ?? null,
-                demo: entry.demo === true,
-                unpriced: 0,
-                error: pricing.error,
-              });
-            } else {
-              setCost(pricing.status === 'error' ? { status: 'error', error: pricing.error } : null);
-            }
-            return;
-          }
-
-          const data = pricing.data;
-          const now = Date.now();
-          const multiplier = discountMultiplier(data, new Date(now));
-          const previousSessions = entry?.sessions ?? {};
-          let total = Number.isFinite(Number(entry?.cost)) ? Number(entry.cost) : 0;
-          let unpriced = 0;
-          const sessions = {};
-
-          for (const session of usageSessions) {
-            if (!session.cwd || normPath(session.cwd) !== workspaceKey) continue;
-            const totals = session.totals;
-            if (!totals || typeof totals !== 'object') continue;
-            const buckets = {
-              input: tokenCount(totals.uncachedInputTokens),
-              output: tokenCount(totals.outputTokens),
-              cacheRead: tokenCount(totals.cacheReadTokens),
-              cacheWrite: tokenCount(totals.cacheWriteTokens),
-            };
-            const previous = previousSessions[session.id] ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-            const delta = {
-              input: Math.max(0, buckets.input - previous.input),
-              output: Math.max(0, buckets.output - previous.output),
-              cacheRead: Math.max(0, buckets.cacheRead - previous.cacheRead),
-              cacheWrite: Math.max(0, buckets.cacheWrite - previous.cacheWrite),
-            };
-            const model = session.model || data.defaultModel;
-            const rates = data.models?.[model] ?? (data.defaultModel ? data.models?.[data.defaultModel] : undefined);
-            const deltaTotal = delta.input + delta.output + delta.cacheRead + delta.cacheWrite;
-            if (rates) {
-              total += costOfTokens(delta, rates, multiplier);
-            } else if (deltaTotal > 0) {
-              unpriced += deltaTotal;
-            }
-            sessions[session.id] = buckets;
-          }
-
-          const next = {
-            currency: data.currency,
-            cost: total,
-            checkedAt: data.checkedAt ?? null,
-            demo: data.demo === true,
-            seededAt: entry?.seededAt ?? now,
-            updatedAt: now,
-            sessions,
-          };
-          ledger.workspaces[workspaceKey] = next;
-          writeCostLedger(ledger);
-          setCost({
-            status: 'ready',
-            currency: next.currency,
-            cost: next.cost,
-            checkedAt: next.checkedAt,
-            demo: next.demo,
-            unpriced,
-            meta: pricing.meta ?? {},
-            error: pricing.error,
-          });
-        }, [workspaceKey, usageSessions, pricing]);
+        }, [refreshTick, ui.open, ui.hidden, workspaceKey]);
 
         /* --------------------------------------------------------------- render */
 
@@ -1238,12 +1267,12 @@ window.__ModuleLoader__.load({
           if (cost.status === 'ready' || cost.status === 'cached') {
             costValue = `≈ ${formatCost(cost.cost, cost.currency)}`;
             if (cost.status === 'cached') costNotes.push(t('cost.unavailable'));
-            if (cost.demo) costNotes.push(t('cost.demo'));
+            costNotes.push(cost.demo ? t('cost.demo') : t('cost.official'));
             if (cost.checkedAt) costNotes.push(t('cost.checked', { time: formatPricingTime(cost.checkedAt) }));
             else costNotes.push(t('cost.never'));
             if (cost.status === 'ready') {
-              if (cost.meta?.error || cost.error) costNotes.push(t('cost.calibrationFailed'));
-              else if (cost.meta?.stale) costNotes.push(t('cost.stale'));
+              if (cost.meta?.error) costNotes.push(t('cost.calibrationFailed'));
+              else if (cost.error || cost.meta?.stale) costNotes.push(t('cost.stale'));
               if (cost.unpriced > 0) costNotes.push(t('cost.unpriced', { tokens: formatTokens(cost.unpriced) }));
             }
           } else if (cost.status === 'error') {

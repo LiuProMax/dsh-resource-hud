@@ -11,7 +11,7 @@ import { createServer } from 'node:http';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DEFAULT_PRICING, apply, deltaCost, isStale, multiplierAt, normalizePricing } from '../index.js';
+import { DEFAULT_PRICING, apply, deltaCost, isStale, multiplierAt, normalizePricing, parseOfficialPricing } from '../index.js';
 
 const table = normalizePricing({
   ...DEFAULT_PRICING,
@@ -52,6 +52,46 @@ const now = Date.parse('2026-11-15T08:00:00Z');
 assert.equal(isStale({ checkedAt: '2026-11-09T08:00:00Z' }, now, 7), false, 'six days old is fresh');
 assert.equal(isStale({ checkedAt: '2026-11-01T08:00:00Z' }, now, 7), true, 'fourteen days old is stale');
 assert.equal(isStale({ checkedAt: null }, now, 7), true, 'never checked is stale');
+
+/* ------------------------------------------------- official markdown parser */
+
+const OFFICIAL = `
+| MODEL | MODEL | MODEL | deepseek-flash(1) | deepseek-v4-pro |
+| --- | --- | --- | --- | --- |
+| PRICING(2) | 1M INPUT TOKENS / (CACHE HIT) | OFF-PEAK | $0.003 | $0.022 |
+| PRICING(2) | 1M INPUT TOKENS / (CACHE HIT) | PEAK | $0.006 | $0.044 |
+| PRICING(2) | 1M INPUT TOKENS / (CACHE MISS) | OFF-PEAK | $0.15 | $0.66 |
+| PRICING(2) | 1M INPUT TOKENS / (CACHE MISS) | PEAK | $0.3 | $1.32 |
+| PRICING(2) | 1M OUTPUT TOKENS | OFF-PEAK | $0.6 | $1.98 |
+| PRICING(2) | 1M OUTPUT TOKENS | PEAK | $1.2 | $3.96 |
+
+(2) Off-peak rates are half of the peak rates. Peak hours are 01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday, excluding Chinese public holidays. All other hours are off-peak, including weekends and Chinese public holidays in full.
+`;
+
+const parsed = parseOfficialPricing(OFFICIAL);
+assert.equal(parsed.currency, 'USD');
+assert.equal(parsed.demo, false);
+assert.equal(parsed.defaultModel, 'deepseek-flash');
+assert.equal(parsed.models['deepseek-flash'].input, 0.15);
+assert.equal(parsed.models['deepseek-flash'].output, 0.6);
+assert.equal(parsed.models['deepseek-flash'].cacheRead, 0.003);
+assert.equal(parsed.models['deepseek-v4-pro'].input, 0.66);
+assert.equal(parsed.utcOffsetMinutes, 480);
+assert.equal(parsed.windows.length, 2);
+assert.deepEqual(parsed.windows[0], { utcFrom: '09:00', utcTo: '12:00', multiplier: 2, days: [1, 2, 3, 4, 5] });
+assert.deepEqual(parsed.windows[1], { utcFrom: '14:00', utcTo: '18:00', multiplier: 2, days: [1, 2, 3, 4, 5] });
+
+const official = normalizePricing(parsed);
+assert.equal(multiplierAt(official, new Date('2026-11-16T01:30:00Z')), 2, 'Monday 09:30 Beijing');
+assert.equal(multiplierAt(official, new Date('2026-11-16T04:30:00Z')), 1, 'Monday 12:30 Beijing');
+assert.equal(multiplierAt(official, new Date('2026-11-16T06:30:00Z')), 2, 'Monday 14:30 Beijing');
+assert.equal(multiplierAt(official, new Date('2026-11-21T01:30:00Z')), 1, 'Saturday 09:30 Beijing is off-peak');
+assert.equal(multiplierAt({ ...official, holidays: ['2026-11-16'] }, new Date('2026-11-16T01:30:00Z')), 1, 'holiday in Beijing is off-peak');
+
+assert.throws(() => normalizePricing({
+  ...DEFAULT_PRICING,
+  windows: [{ utcFrom: '01:00', utcTo: '04:00', multiplier: 2, days: [7] }],
+}), /days/);
 
 /* ------------------------------------------------ host route and calibration */
 

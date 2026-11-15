@@ -2,9 +2,9 @@
   "schema": 1,
   "currency": "CNY",
   "unit": "per_million_tokens",
-  "version": "2026-11-15-demo",
+  "version": "2026-11-15-fallback",
   "demo": true,
-  "note": "Sample rates for the cost estimate. Replace them with the current prices of your provider.",
+  "note": "Fallback sample rates only. The plugin calibrates the official DeepSeek pricing page weekly.",
   "defaultModel": "deepseek-flash",
   "models": {
     "deepseek-flash": {

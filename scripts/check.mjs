@@ -70,6 +70,7 @@ const hostImports = [...host.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)].map((match)
 check(hostImports.every((specifier) => specifier.startsWith('node:')), 'the host half imports only node: built-ins');
 check(host.includes("export const inject = ['webServer']"), 'the host half must inject the webServer service');
 check(host.includes("'/api/workspace-hud/pricing'"), 'the host half must expose the pricing route');
+check(host.includes('api-docs.deepseek.com'), 'the host half must default to the official pricing page');
 check(/demo:\s*true/.test(host), 'the built-in fallback table must be marked demo');
 
 /* --------------------------------------------------------------- pricing */

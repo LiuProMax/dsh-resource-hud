@@ -138,12 +138,22 @@ GET /api/workspace-hud/pricing
 ```
 
 On each read the host checks `checkedAt`. If the table is older than `refreshDays`
-(default 7), it fetches `pricingSourceUrl`, validates the payload, writes the new
-table atomically (keeping a `.bak`), and only then answers. A failed fetch keeps
+(default 7), or is still the demo fallback from a different source, it fetches
+`pricingSourceUrl` — by default the Markdown edition of the official DeepSeek
+pricing page — parses the model rates and peak windows, writes the new table
+atomically (keeping a `.bak`), and only then answers. A failed fetch or parse keeps
 the previous table and returns `meta.error`, which the card renders as
 "calibration failed, using local prices".
 
-The card keeps a ledger in `localStorage["dsh.workspace-hud.cost.v1"]`:
+The official page publishes off-peak and peak prices per model; the host stores the
+off-peak rates as the base and turns the peak windows into `windows` entries with
+the peak/off-peak ratio (2) and the weekday restriction. A calibrated table is in
+USD, includes `deepseek-flash` and `deepseek-v4-pro`, and has two peak windows
+in Beijing time (09:00–12:00 and 14:00–18:00, Monday–Friday).
+
+Every cost pass (60 s) fetches the route **first**, then `session.list`, so the
+increment is priced with the table and the time coefficient fetched in that same
+pass. The card keeps a ledger in `localStorage["dsh.workspace-hud.cost.v1"]`:
 
 ```js
 { version: 1, workspaces: {
@@ -154,11 +164,12 @@ The card keeps a ledger in `localStorage["dsh.workspace-hud.cost.v1"]`:
 } }
 ```
 
-Every time the usage snapshot changes (60 s), it subtracts the stored buckets from
-the current ones and prices the positive delta with the rates effective at that
-instant — the session's last model, the table's rates, and the UTC off-peak
-multiplier. A new workspace is seeded by pricing its current totals, then the
-buckets become the baseline.
+It subtracts the stored buckets from the fresh snapshot and prices the positive
+delta with the rates effective at that instant — the session's last model, the
+table's rates, and the peak/off-peak multiplier for the current Beijing weekday/time.
+A new workspace is seeded by pricing its current totals, then the buckets become
+the baseline. A currency change (demo CNY to official USD) starts a fresh ledger so
+amounts in two currencies are never added.
 
 The full schema, configuration knobs, and accuracy limits are in
 [docs/cost.md](cost.md).
