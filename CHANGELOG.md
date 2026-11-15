@@ -19,8 +19,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- Project renamed to **DHS-资源统计弹窗**; the repository moved to
-  `LiuProMax/dhs-resource-hud` and the card title follows the new name.
+- Project renamed to **DSH-资源统计弹窗**; the repository moved to
+  `LiuProMax/dsh-resource-hud` and the card title follows the new name.
 
 ## [1.4.0] - 2026-11-15
 
@@ -94,10 +94,10 @@ All notable changes to this project are documented here. The format follows
 - Account balance with bonus credit, account name, and refresh on focus.
 - Collapse and hide controls, persisted per browser.
 
-[Unreleased]: https://github.com/LiuProMax/dhs-resource-hud/compare/v1.4.1...HEAD
-[1.4.1]: https://github.com/LiuProMax/dhs-resource-hud/compare/v1.4.0...v1.4.1
-[1.4.0]: https://github.com/LiuProMax/dhs-resource-hud/compare/v1.3.0...v1.4.0
-[1.3.0]: https://github.com/LiuProMax/dhs-resource-hud/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/LiuProMax/dhs-resource-hud/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/LiuProMax/dhs-resource-hud/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/LiuProMax/dhs-resource-hud/releases/tag/v1.0.0
+[Unreleased]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/LiuProMax/dsh-resource-hud/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/LiuProMax/dsh-resource-hud/releases/tag/v1.0.0

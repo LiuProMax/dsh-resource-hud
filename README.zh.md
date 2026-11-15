@@ -1,6 +1,6 @@
-# DHS-资源统计弹窗
+# DSH-资源统计弹窗
 
-[![CI](https://github.com/LiuProMax/dhs-resource-hud/actions/workflows/ci.yml/badge.svg)](https://github.com/LiuProMax/dhs-resource-hud/actions/workflows/ci.yml)
+[![CI](https://github.com/LiuProMax/dsh-resource-hud/actions/workflows/ci.yml/badge.svg)](https://github.com/LiuProMax/dsh-resource-hud/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
@@ -11,7 +11,7 @@
 - Token 消耗，分成 **账户** 与 **工作区** 两个口径；
 - **工作区花费**估值，按 DeepSeek 官方价目表计价。
 
-![DHS-资源统计弹窗](assets/preview.png)
+![DSH-资源统计弹窗](assets/preview.png)
 
 <sub>截图中的工作区路径、账户名、余额与用量数字已打码。</sub>
 
@@ -40,8 +40,8 @@
 
 1. 打开 Harness 侧栏的 **插件** 页面。
 2. 选择安装，粘贴以下任一形式：
-   - `github:LiuProMax/dhs-resource-hud`
-   - `https://github.com/LiuProMax/dhs-resource-hud`
+   - `github:LiuProMax/dsh-resource-hud`
+   - `https://github.com/LiuProMax/dsh-resource-hud`
 3. 确认安装。Harness 会实时重组 profile，浮窗出现在右上角。
 
 ### 方式 B：手工安装到桌面版 profile
@@ -63,7 +63,7 @@ bash ./install.sh
 ### 方式 C：非桌面版 profile
 
 ```bash
-dsh plugin --profile <profile> add github:LiuProMax/dhs-resource-hud
+dsh plugin --profile <profile> add github:LiuProMax/dsh-resource-hud
 ```
 
 桌面版的 profile 由 Electron 应用独占管理，`dsh plugin` 会拒绝；桌面版请用方式 A 或 B。
@@ -115,8 +115,8 @@ dsh plugin --profile <profile> add github:LiuProMax/dhs-resource-hud
 插件是纯 JavaScript，没有编译步骤。
 
 ```bash
-git clone https://github.com/LiuProMax/dhs-resource-hud.git
-cd dhs-resource-hud
+git clone https://github.com/LiuProMax/dsh-resource-hud.git
+cd dsh-resource-hud
 npm run check          # 校验 manifest、patch 与 client 注册
 npm test               # 价目表校验、错峰窗口、费用公式、校准过期
 node --check index.js

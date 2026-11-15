@@ -15,8 +15,8 @@ so the process is intentionally light.
 No build step and no runtime dependencies are required.
 
 ```bash
-git clone https://github.com/LiuProMax/dhs-resource-hud.git
-cd dhs-resource-hud
+git clone https://github.com/LiuProMax/dsh-resource-hud.git
+cd dsh-resource-hud
 npm run check
 node --check index.js
 node --check client.js

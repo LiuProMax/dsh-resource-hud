@@ -1,6 +1,6 @@
-# DHS-资源统计弹窗
+# DSH-资源统计弹窗
 
-[![CI](https://github.com/LiuProMax/dhs-resource-hud/actions/workflows/ci.yml/badge.svg)](https://github.com/LiuProMax/dhs-resource-hud/actions/workflows/ci.yml)
+[![CI](https://github.com/LiuProMax/dsh-resource-hud/actions/workflows/ci.yml/badge.svg)](https://github.com/LiuProMax/dsh-resource-hud/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
@@ -11,7 +11,7 @@ A pinned, draggable overlay for the [DeepSeek Harness](https://github.com/deepse
 - token usage, split into **account** and **workspace** totals,
 - an estimated **workspace cost**, priced from a table calibrated from the official DeepSeek pricing page.
 
-![DHS-资源统计弹窗](assets/preview.png)
+![DSH-资源统计弹窗](assets/preview.png)
 
 <sub>Screenshot: the workspace path, account name, balance, and usage figures are redacted.</sub>
 
@@ -40,8 +40,8 @@ English | [中文](README.zh.md)
 
 1. Open **Plugins** in the Harness sidebar.
 2. Choose **Install** and paste either form:
-   - `github:LiuProMax/dhs-resource-hud`
-   - `https://github.com/LiuProMax/dhs-resource-hud`
+   - `github:LiuProMax/dsh-resource-hud`
+   - `https://github.com/LiuProMax/dsh-resource-hud`
 3. Approve the install. Harness reloads the profile live; the card appears in the top-right corner.
 
 ### Option B — manual install into the Desktop profile
@@ -63,7 +63,7 @@ Both scripts back up nothing and only rewrite the profile's `dsh.profile.bundles
 ### Option C — any non-Desktop DSH profile
 
 ```bash
-dsh plugin --profile <profile> add github:LiuProMax/dhs-resource-hud
+dsh plugin --profile <profile> add github:LiuProMax/dsh-resource-hud
 ```
 
 The Desktop profile is owned by the Electron application, so `dsh plugin` refuses it — use Option A or B there.
@@ -115,8 +115,8 @@ See [docs/how-it-works.md](docs/how-it-works.md) for the component flow, storage
 The plugin is plain JavaScript; there is nothing to compile.
 
 ```bash
-git clone https://github.com/LiuProMax/dhs-resource-hud.git
-cd dhs-resource-hud
+git clone https://github.com/LiuProMax/dsh-resource-hud.git
+cd dsh-resource-hud
 npm run check          # manifest, patch, and client wiring checks
 npm test               # pricing schema, official parser, peak windows, cost formula, staleness
 node --check index.js

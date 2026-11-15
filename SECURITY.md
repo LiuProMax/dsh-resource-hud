@@ -12,7 +12,7 @@
 Please do not open a public issue for a security problem. Use GitHub's private
 vulnerability reporting:
 
-<https://github.com/LiuProMax/dhs-resource-hud/security/advisories/new>
+<https://github.com/LiuProMax/dsh-resource-hud/security/advisories/new>
 
 If private reporting is unavailable, open an issue that asks for a private
 contact channel without disclosing details.

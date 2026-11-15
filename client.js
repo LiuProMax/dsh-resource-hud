@@ -19,7 +19,7 @@ window.__ModuleLoader__.load({
     const CARD_MIN_VISIBLE = 48;
 
     const zh = {
-      'title': 'DHS-资源统计弹窗',
+      'title': 'DSH-资源统计弹窗',
       'dragHint': '拖动可移动，双击复位',
       'refresh': '刷新',
       'collapse': '折叠',
@@ -65,7 +65,7 @@ window.__ModuleLoader__.load({
     };
 
     const en = {
-      'title': 'DHS resource stats',
+      'title': 'DSH resource stats',
       'dragHint': 'Drag to move, double-click to reset',
       'refresh': 'Refresh',
       'collapse': 'Collapse',
