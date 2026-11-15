@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate the package
+        run: node scripts/check.mjs
+
+      - name: Build the archive
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          mkdir -p "dist/dsh-workspace-hud"
+          cp package.json index.js client.js cordis.patch.yml icon.svg README.md README.zh.md LICENSE dist/dsh-workspace-hud/
+          cd dist
+          zip -r "dsh-workspace-hud-v${version}.zip" dsh-workspace-hud
+          echo "ARCHIVE=dist/dsh-workspace-hud-v${version}.zip" >> "$GITHUB_ENV"
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$ARCHIVE" --clobber
+          else
+            gh release create "$tag" "$ARCHIVE" --generate-notes --title "$tag"
+          fi

@@ -1,0 +1,61 @@
+{
+  "name": "dsh-workspace-hud",
+  "version": "1.1.0",
+  "description": "Pinned workspace HUD for DeepSeek Harness: workspace files, account balance, and account/workspace token usage.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "hud",
+    "tokens",
+    "usage",
+    "balance",
+    "workspace"
+  ],
+  "license": "MIT",
+  "author": "LiuProMax",
+  "homepage": "https://github.com/LiuProMax/dsh-workspace-hud#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LiuProMax/dsh-workspace-hud.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LiuProMax/dsh-workspace-hud/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "assets/preview.png",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "icon": "./icon.svg",
+  "scripts": {
+    "check": "node scripts/check.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  }
+}

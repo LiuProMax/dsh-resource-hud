@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Workspace HUD">
+  <defs>
+    <linearGradient id="hud" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5686fe"/>
+      <stop offset="1" stop-color="#4176e6"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#hud)"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="14" y="15" width="36" height="26" rx="4" stroke-width="2.4"/>
+    <path d="M14 23h36" stroke-width="2.4" opacity=".8"/>
+    <path d="M23 35v-4M32 35v-8M41 35v-6" stroke-width="2.6"/>
+    <path d="M26 48h12" stroke-width="2.4" opacity=".8"/>
+  </g>
+</svg>

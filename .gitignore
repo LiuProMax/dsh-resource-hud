@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# logs and local state
+*.log
+npm-debug.log*
+.plugin-manager/
+.env
+.env.*
+
+# editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# build and packaging output
+*.zip
+*.tgz
