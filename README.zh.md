@@ -95,8 +95,9 @@ dsh plugin --profile <profile> add github:LiuProMax/dsh-workspace-hud
 ## 隐私
 
 - 只读取 Harness 已经暴露给它自己 Web UI 的数据，不写文件、不执行命令。
+- 所有数据都来自**加载者本机**的 Harness：别人运行这个插件看到的是他自己的会话和账户，不是发布者的；包里没有凭据、账户数据或 token。
 - 无统计、无外部请求；唯一的网络流量是 Harness 自己的账户与会话服务。
-- 本地状态只有 `localStorage["dsh.workspace-hud.v1"]`（位置、可见性、Token 口径）。
+- 本地状态只有 `localStorage["dsh.workspace-hud.v1"]`（位置与可见性）。
 
 ## 已知边界
 

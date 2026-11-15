@@ -95,8 +95,9 @@ See [docs/how-it-works.md](docs/how-it-works.md) for the component flow, storage
 ## Privacy
 
 - Reads only what Harness already exposes to its own Web UI. No files are written, no shell commands run.
+- Every value comes from the **viewer's own** local Harness: another person running this plugin sees their own sessions and account, never the publisher's. The package ships no credentials, account data, or tokens.
 - No analytics, no external requests; the only network traffic is Harness's own account and session services.
-- State is limited to `localStorage["dsh.workspace-hud.v1"]` (position, visibility, token scope).
+- State is limited to `localStorage["dsh.workspace-hud.v1"]` (position and visibility).
 
 ## Limitations
 
