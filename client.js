@@ -12,6 +12,9 @@ window.__ModuleLoader__.load({
     const FILES_REFRESH_MS = 8000;
     const ACCOUNT_REFRESH_MS = 60000;
     const USAGE_REFRESH_MS = 60000;
+    const PRICING_REFRESH_MS = 300000;
+    const PRICING_ROUTE = '/api/workspace-hud/pricing';
+    const COST_KEY = 'dsh.workspace-hud.cost.v1';
     const MAX_ROWS_PER_LEVEL = 80;
     const CARD_WIDTH = 344;
     const CARD_MIN_VISIBLE = 48;
@@ -50,6 +53,15 @@ window.__ModuleLoader__.load({
       'tokens.loading': '统计中…',
       'tokens.total': '合计',
       'tokens.foot': '当前工作区 {workspace} 个会话 · 账户 {account} 个会话',
+      'cost.title': '工作区花费',
+      'cost.loading': '读取价格…',
+      'cost.unavailable': '价格不可用',
+      'cost.demo': '示例价',
+      'cost.checked': '校准 {time}',
+      'cost.never': '未校准',
+      'cost.stale': '价格可能过期',
+      'cost.calibrationFailed': '校准失败，沿用本地价格',
+      'cost.unpriced': '{tokens} tokens 未计价',
     };
 
     const en = {
@@ -86,6 +98,15 @@ window.__ModuleLoader__.load({
       'tokens.loading': 'Counting…',
       'tokens.total': 'Total',
       'tokens.foot': 'Workspace {workspace} sessions · Account {account} sessions',
+      'cost.title': 'Workspace cost',
+      'cost.loading': 'Reading prices…',
+      'cost.unavailable': 'Prices unavailable',
+      'cost.demo': 'sample rates',
+      'cost.checked': 'checked {time}',
+      'cost.never': 'not calibrated',
+      'cost.stale': 'prices may be stale',
+      'cost.calibrationFailed': 'calibration failed, using local prices',
+      'cost.unpriced': '{tokens} tokens unpriced',
     };
 
     const CSS = `
@@ -327,6 +348,24 @@ window.__ModuleLoader__.load({
         color: var(--dsw-alias-label-primary);
         font: var(--dsw-font-xs-strong-13);
       }
+      .wshud-cost {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 0.5px solid var(--dsw-alias-border-l1);
+      }
+      .wshud-cost span {
+        color: var(--dsw-alias-label-tertiary);
+        font: var(--dsw-font-xxxs-11);
+      }
+      .wshud-cost b {
+        color: var(--dsw-alias-label-primary);
+        font: var(--dsw-font-xs-strong-13);
+        font-variant-numeric: tabular-nums;
+      }
       .wshud-pill {
         position: fixed;
         top: calc(var(--dsh-windows-titlebar-height, 0px) + 14px);
@@ -401,6 +440,68 @@ window.__ModuleLoader__.load({
       const number = Number(amount);
       if (!Number.isFinite(number)) return `${symbol}${String(amount ?? '')}`;
       return symbol + number.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatCost(amount, currency) {
+      const number = Number(amount);
+      if (!Number.isFinite(number)) return '—';
+      const symbol = currency === 'CNY' ? '¥' : currency === 'USD' ? '$' : `${currency || ''} `;
+      return `${symbol}${number.toFixed(number > 0 && number < 1 ? 4 : 2)}`;
+    }
+
+    function formatPricingTime(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleString(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+
+    /** Cost of one token increment, in the price table's currency. Mirrors the host. */
+    function costOfTokens(tokens, rates, multiplier) {
+      if (!rates) return 0;
+      const units = (
+        tokenCount(tokens.input) * rates.input +
+        tokenCount(tokens.output) * rates.output +
+        tokenCount(tokens.cacheRead) * rates.cacheRead +
+        tokenCount(tokens.cacheWrite) * rates.cacheWrite
+      ) / 1000000;
+      return units * (multiplier || 1);
+    }
+
+    /** The off-peak multiplier in effect at `date`; windows in the table are UTC. */
+    function discountMultiplier(pricing, date) {
+      const minutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+      let multiplier = 1;
+      for (const window of pricing?.windows ?? []) {
+        const active = window.overnight
+          ? minutes >= window.from || minutes < window.to
+          : minutes >= window.from && minutes < window.to;
+        if (active) multiplier = window.multiplier;
+      }
+      return multiplier;
+    }
+
+    function readCostLedger() {
+      const empty = { version: 1, workspaces: {} };
+      try {
+        const raw = window.localStorage.getItem(COST_KEY);
+        if (!raw) return empty;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || !parsed.workspaces || typeof parsed.workspaces !== 'object') {
+          return empty;
+        }
+        return parsed;
+      } catch {
+        return empty;
+      }
+    }
+
+    function writeCostLedger(ledger) {
+      try {
+        window.localStorage.setItem(COST_KEY, JSON.stringify(ledger));
+      } catch {
+        /* a storage failure must not break the card */
+      }
     }
 
     function formatClock(time) {
@@ -801,6 +902,7 @@ window.__ModuleLoader__.load({
               id: item.sessionId,
               cwd: item.cwd,
               totals: item.projections?.values?.tokenUsage,
+              model: item.projections?.values?.modelSelection?.lastUsed?.model,
             });
           }
           for (const row of rows) {
@@ -812,6 +914,7 @@ window.__ModuleLoader__.load({
               id: row.id,
               cwd: row.cwd ?? previous?.cwd,
               totals: live ?? previous?.totals,
+              model: row.projectionValues?.modelSelection?.lastUsed?.model ?? previous?.model,
             });
           }
           return [...byId.values()];
@@ -827,6 +930,138 @@ window.__ModuleLoader__.load({
         }, [usageSessions, workspaceKey, current]);
 
         const accountUsage = useMemo(() => summarizeUsage(usageSessions), [usageSessions]);
+
+        /* ------------------------------------------------------------- pricing */
+
+        /**
+         * The local price table lives on the host (`~/.dsh/workspace-hud/pricing.json`).
+         * The host calibrates it from the network when it is older than a week and
+         * answers this read-only route with the table plus its calibration state.
+         */
+        const [pricing, setPricing] = useState({ status: 'loading', data: null, meta: null, error: null });
+
+        useEffect(() => {
+          if (!ui.open || ui.hidden) return undefined;
+          let alive = true;
+          const controller = new AbortController();
+
+          const load = async () => {
+            try {
+              const response = await fetch(PRICING_ROUTE, { signal: controller.signal, cache: 'no-store' });
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              const body = await response.json();
+              if (!body || body.ok === false || !body.pricing) throw new Error(body?.error || 'pricing unavailable');
+              if (!alive) return;
+              setPricing({ status: 'ready', data: body.pricing, meta: body.meta ?? {}, error: null });
+            } catch (error) {
+              if (!alive) return;
+              setPricing((previous) => previous.data
+                ? { ...previous, status: 'stale', error: String(error?.message ?? error) }
+                : { status: 'error', data: null, meta: null, error: String(error?.message ?? error) });
+            }
+          };
+
+          load();
+          const timer = window.setInterval(load, PRICING_REFRESH_MS);
+          return () => {
+            alive = false;
+            controller.abort();
+            window.clearInterval(timer);
+          };
+        }, [refreshTick, ui.open, ui.hidden]);
+
+        const [cost, setCost] = useState(null);
+
+        /**
+         * Price the *increment* of every bucket since the last pass with the price
+         * in effect right now, and add it to the workspace ledger. Seeding a new
+         * workspace prices its existing totals at today's rates, which is why the
+         * card calls the number an estimate.
+         */
+        useEffect(() => {
+          if (!workspaceKey) {
+            setCost(null);
+            return;
+          }
+
+          const ledger = readCostLedger();
+          const entry = ledger.workspaces[workspaceKey];
+
+          if (!pricing.data) {
+            if (entry) {
+              setCost({
+                status: 'cached',
+                currency: entry.currency,
+                cost: entry.cost,
+                checkedAt: entry.checkedAt ?? null,
+                demo: entry.demo === true,
+                unpriced: 0,
+                error: pricing.error,
+              });
+            } else {
+              setCost(pricing.status === 'error' ? { status: 'error', error: pricing.error } : null);
+            }
+            return;
+          }
+
+          const data = pricing.data;
+          const now = Date.now();
+          const multiplier = discountMultiplier(data, new Date(now));
+          const previousSessions = entry?.sessions ?? {};
+          let total = Number.isFinite(Number(entry?.cost)) ? Number(entry.cost) : 0;
+          let unpriced = 0;
+          const sessions = {};
+
+          for (const session of usageSessions) {
+            if (!session.cwd || normPath(session.cwd) !== workspaceKey) continue;
+            const totals = session.totals;
+            if (!totals || typeof totals !== 'object') continue;
+            const buckets = {
+              input: tokenCount(totals.uncachedInputTokens),
+              output: tokenCount(totals.outputTokens),
+              cacheRead: tokenCount(totals.cacheReadTokens),
+              cacheWrite: tokenCount(totals.cacheWriteTokens),
+            };
+            const previous = previousSessions[session.id] ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+            const delta = {
+              input: Math.max(0, buckets.input - previous.input),
+              output: Math.max(0, buckets.output - previous.output),
+              cacheRead: Math.max(0, buckets.cacheRead - previous.cacheRead),
+              cacheWrite: Math.max(0, buckets.cacheWrite - previous.cacheWrite),
+            };
+            const model = session.model || data.defaultModel;
+            const rates = data.models?.[model] ?? (data.defaultModel ? data.models?.[data.defaultModel] : undefined);
+            const deltaTotal = delta.input + delta.output + delta.cacheRead + delta.cacheWrite;
+            if (rates) {
+              total += costOfTokens(delta, rates, multiplier);
+            } else if (deltaTotal > 0) {
+              unpriced += deltaTotal;
+            }
+            sessions[session.id] = buckets;
+          }
+
+          const next = {
+            currency: data.currency,
+            cost: total,
+            checkedAt: data.checkedAt ?? null,
+            demo: data.demo === true,
+            seededAt: entry?.seededAt ?? now,
+            updatedAt: now,
+            sessions,
+          };
+          ledger.workspaces[workspaceKey] = next;
+          writeCostLedger(ledger);
+          setCost({
+            status: 'ready',
+            currency: next.currency,
+            cost: next.cost,
+            checkedAt: next.checkedAt,
+            demo: next.demo,
+            unpriced,
+            meta: pricing.meta ?? {},
+            error: pricing.error,
+          });
+        }, [workspaceKey, usageSessions, pricing]);
 
         /* --------------------------------------------------------------- render */
 
@@ -997,6 +1232,31 @@ window.__ModuleLoader__.load({
           usageCells.push(h('b', { key: `usage-${field}-w`, className: 'wshud-usage-value' }, formatTokens(workspaceUsage[field])));
         }
 
+        const costNotes = [];
+        let costValue = t('cost.loading');
+        if (cost) {
+          if (cost.status === 'ready' || cost.status === 'cached') {
+            costValue = `≈ ${formatCost(cost.cost, cost.currency)}`;
+            if (cost.status === 'cached') costNotes.push(t('cost.unavailable'));
+            if (cost.demo) costNotes.push(t('cost.demo'));
+            if (cost.checkedAt) costNotes.push(t('cost.checked', { time: formatPricingTime(cost.checkedAt) }));
+            else costNotes.push(t('cost.never'));
+            if (cost.status === 'ready') {
+              if (cost.meta?.error || cost.error) costNotes.push(t('cost.calibrationFailed'));
+              else if (cost.meta?.stale) costNotes.push(t('cost.stale'));
+              if (cost.unpriced > 0) costNotes.push(t('cost.unpriced', { tokens: formatTokens(cost.unpriced) }));
+            }
+          } else if (cost.status === 'error') {
+            costValue = t('cost.unavailable');
+          }
+        } else if (pricing.status === 'error') {
+          costValue = t('cost.unavailable');
+        }
+
+        const costLine = h('div', { className: 'wshud-cost' },
+          h('span', null, t('cost.title')),
+          h('b', null, costValue));
+
         const tokensSection = h('section', { className: 'wshud-sec', 'aria-label': t('tokens.title') },
           h('div', { className: 'wshud-sechead' },
             h('span', null, t('tokens.title')),
@@ -1004,6 +1264,8 @@ window.__ModuleLoader__.load({
           accountUsage.total + workspaceUsage.total > 0
             ? h('div', { className: 'wshud-usage' }, ...usageCells)
             : h('div', { className: 'wshud-note' }, t('tokens.empty')),
+          costLine,
+          costNotes.length > 0 ? h('div', { className: 'wshud-sub' }, costNotes.join(' · ')) : null,
           h('div', { className: 'wshud-sub' },
             t('tokens.foot', {
               workspace: workspaceUsage.sessions,

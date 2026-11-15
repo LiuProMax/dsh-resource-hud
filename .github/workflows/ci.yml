@@ -25,6 +25,9 @@ jobs:
       - name: Validate package, patch, and client wiring
         run: node scripts/check.mjs
 
+      - name: Check the pricing helpers
+        run: node scripts/cost.test.mjs
+
       - name: Parse the host half
         run: node --check index.js
 

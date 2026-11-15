@@ -1,7 +1,7 @@
 {
   "name": "dsh-workspace-hud",
-  "version": "1.2.0",
-  "description": "Pinned workspace HUD for DeepSeek Harness: workspace files, account balance, and account/workspace token usage.",
+  "version": "1.3.0",
+  "description": "Pinned workspace HUD for DeepSeek Harness: workspace files, account balance, token usage, and an estimated workspace cost.",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -9,6 +9,8 @@
     "hud",
     "tokens",
     "usage",
+    "cost",
+    "pricing",
     "balance",
     "workspace"
   ],
@@ -35,6 +37,7 @@
     "index.js",
     "client.js",
     "cordis.patch.yml",
+    "pricing.json",
     "icon.svg",
     "assets/preview.png",
     "README.md",
@@ -43,7 +46,8 @@
   ],
   "icon": "./icon.svg",
   "scripts": {
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "test": "node scripts/cost.test.mjs"
   },
   "dsh": {
     "bundle": {

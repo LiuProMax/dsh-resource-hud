@@ -127,6 +127,42 @@ scope toggle.
 The list read runs only while the card is expanded and visible, every 60 seconds,
 and immediately after a refresh or re-expansion.
 
+## Workspace cost
+
+The host half (`index.js`) owns a price table at
+`$DSH_HOME/workspace-hud/pricing.json` and serves it to the card over one exact
+route:
+
+```
+GET /api/workspace-hud/pricing
+```
+
+On each read the host checks `checkedAt`. If the table is older than `refreshDays`
+(default 7), it fetches `pricingSourceUrl`, validates the payload, writes the new
+table atomically (keeping a `.bak`), and only then answers. A failed fetch keeps
+the previous table and returns `meta.error`, which the card renders as
+"calibration failed, using local prices".
+
+The card keeps a ledger in `localStorage["dsh.workspace-hud.cost.v1"]`:
+
+```js
+{ version: 1, workspaces: {
+  "<normalized cwd>": {
+    currency, cost, checkedAt, demo, seededAt, updatedAt,
+    sessions: { "<sessionId>": { input, output, cacheRead, cacheWrite } },
+  },
+} }
+```
+
+Every time the usage snapshot changes (60 s), it subtracts the stored buckets from
+the current ones and prices the positive delta with the rates effective at that
+instant — the session's last model, the table's rates, and the UTC off-peak
+multiplier. A new workspace is seeded by pricing its current totals, then the
+buckets become the baseline.
+
+The full schema, configuration knobs, and accuracy limits are in
+[docs/cost.md](cost.md).
+
 ## Drag and persistence
 
 The title bar handles `pointerdown` / `pointermove` / `pointerup`:

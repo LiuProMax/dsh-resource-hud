@@ -66,7 +66,32 @@ check(/id:\s*workspace-hud\s*$/m.test(patch), 'cordis.patch.yml must declare the
 
 const host = read('index.js');
 check(/export function apply\s*\(/.test(host), 'index.js must export apply()');
-check(!/require\(|from\s+['"][^'"]+['"]/.test(host), 'the host half must not import other modules');
+const hostImports = [...host.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)].map((match) => match[1]);
+check(hostImports.every((specifier) => specifier.startsWith('node:')), 'the host half imports only node: built-ins');
+check(host.includes("export const inject = ['webServer']"), 'the host half must inject the webServer service');
+check(host.includes("'/api/workspace-hud/pricing'"), 'the host half must expose the pricing route');
+check(/demo:\s*true/.test(host), 'the built-in fallback table must be marked demo');
+
+/* --------------------------------------------------------------- pricing */
+
+let pricing = null;
+try {
+  pricing = JSON.parse(read('pricing.json'));
+} catch (error) {
+  failures.push(`pricing.json is not valid JSON: ${error.message}`);
+}
+
+if (pricing !== null) {
+  check(pricing.schema === 1, 'pricing.json must use schema 1');
+  check(pricing.unit === 'per_million_tokens', 'pricing.json unit must be per_million_tokens');
+  check(typeof pricing.currency === 'string' && pricing.currency.length > 0, 'pricing.json must declare a currency');
+  check(pricing.models && typeof pricing.models === 'object' && Object.keys(pricing.models).length > 0, 'pricing.json must ship at least one model rate');
+  for (const [name, rates] of Object.entries(pricing.models ?? {})) {
+    for (const field of ['input', 'output', 'cacheRead', 'cacheWrite']) {
+      check(typeof rates?.[field] === 'number' && rates[field] >= 0, `pricing model ${name}.${field} must be a non-negative number`);
+    }
+  }
+}
 
 /* ---------------------------------------------------------- client half */
 
@@ -81,10 +106,14 @@ check(client.includes("ctx.slots.inject('shell.overlay'"), 'client.js must regis
 check(client.includes('workspaceFiles'), 'client.js must read workspace files through remote.workspaceFiles');
 check(client.includes('getBalance'), 'client.js must read the account balance');
 check(client.includes('session.list'), 'client.js must aggregate token usage from the session list');
+check(client.includes('PRICING_ROUTE'), 'client.js must read the local price table from the host route');
+check(client.includes('COST_KEY'), 'client.js must persist the per-workspace cost ledger');
+check(client.includes('costOfTokens'), 'client.js must price token increments');
+check(client.includes('wshud-cost'), 'client.js must render the workspace cost');
 
 /* --------------------------------------------------------------- docs */
 
-for (const file of ['LICENSE', 'README.md', 'README.zh.md', 'assets/preview.png']) {
+for (const file of ['LICENSE', 'README.md', 'README.zh.md', 'assets/preview.png', 'docs/cost.md']) {
   check(existsSync(join(root, file)), `${file} is missing`);
 }
 

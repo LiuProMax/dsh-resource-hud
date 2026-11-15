@@ -4,11 +4,12 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
-一个置顶、可拖拽的浮窗插件，给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Web UI 常驻显示三件事：
+一个置顶、可拖拽的浮窗插件，给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Web UI 常驻显示四件事：
 
 - 当前工作区的文件；
 - 当前账户的余额；
-- Token 消耗，分成 **账户** 与 **工作区** 两个口径。
+- Token 消耗，分成 **账户** 与 **工作区** 两个口径；
+- **工作区花费**估值，按本地价目表计价。
 
 ![工作区概览](assets/preview.png)
 
@@ -21,10 +22,11 @@
 - **工作区文件**：当前会话工作目录的目录树（目录按需展开），文件带大小；点击文件在 Harness 右侧预览中打开。每 8 秒自动刷新。
 - **账户余额**：已登录账户的钱包余额、赠送余额、账户名与更新时间。每 60 秒或窗口重新聚焦时刷新。
 - **Token 消耗，两个口径**：表格里并排对比 **账户**（本机所有会话）与 **工作区**（同一 `cwd` 的会话），各自都有合计、输入、输出、缓存读取、缓存写入五行，不用切换就能对照。
+- **工作区花费，增量计价**：每 60 秒把新增的 Token 增量按**当时生效**的单价计价并累加到该工作区的账本。价目表是本地 JSON 文件，支持按模型定价与 UTC 错峰时段，每周从网络校准一次。详见 [docs/cost.md](docs/cost.md)。
 - **实时数字**：打开中的会话直接读实时投影，对话流式输出时数字同步增长。
 - **置顶但不碍事**：拖标题栏可移动，双击回到默认位置；位置、折叠和隐藏状态都记录在 `localStorage`。
 - **跟随主题**：只使用 `--dsw-*` 设计 token，明暗主题与宿主排版一致。
-- **零依赖、零构建、无额外网络请求**。
+- **零依赖、零构建**：唯一的网络请求是每周一次的价目表校准。
 
 ## 要求
 
@@ -81,7 +83,7 @@ dsh plugin --profile <profile> add github:LiuProMax/dsh-workspace-hud
 
 ## 实现方式
 
-插件挂载一个宿主行（`workspace-hud`），其包同时声明 `dsh.client` 浏览器半。浏览器半把 React 组件注册到 `shell.overlay` 槽位——Harness 在所有面板之上渲染的那一层。数据全部走已有的公开服务：
+插件挂载一个宿主行（`workspace-hud`），其包同时声明 `dsh.client` 浏览器半。浏览器半把 React 组件注册到 `shell.overlay` 槽位——Harness 在所有面板之上渲染的那一层。大部分数据走已有的公开服务，宿主半只加了一条本地价目表路由：
 
 | 区域 | 来源 |
 |---|---|
@@ -89,19 +91,21 @@ dsh plugin --profile <profile> add github:LiuProMax/dsh-workspace-hud
 | 文件树 | `ctx.remote.workspaceFiles.list`，只读 |
 | 余额 | `ctx.remote.account.getBalance` / `getProfile` |
 | Token | `ctx.remote.session.list` 每条会话的 `projections.values.tokenUsage`，并用实时投影覆盖 |
+| 工作区花费 | 宿主路由 `GET /api/workspace-hud/pricing`（本地 JSON 价目表，每周校准），增量费用记在 `localStorage` |
 
-组件流程、存储键与拖拽实现见 [docs/how-it-works.md](docs/how-it-works.md)。
+组件流程、存储键与拖拽实现见 [docs/how-it-works.md](docs/how-it-works.md)；价目表结构与费用公式见 [docs/cost.md](docs/cost.md)。
 
 ## 隐私
 
-- 只读取 Harness 已经暴露给它自己 Web UI 的数据，不写文件、不执行命令。
+- 卡片只读取 Harness 已经暴露给它自己 Web UI 的数据；宿主半只写自己的价目表文件，不读凭据，也不读会话日志。
 - 所有数据都来自**加载者本机**的 Harness：别人运行这个插件看到的是他自己的会话和账户，不是发布者的；包里没有凭据、账户数据或 token。
-- 无统计、无外部请求；唯一的网络流量是 Harness 自己的账户与会话服务。
-- 本地状态只有 `localStorage["dsh.workspace-hud.v1"]`（位置与可见性）。
+- 无统计；除每周一次的价目表校准外没有额外网络请求，其余流量是 Harness 自己的账户与会话服务。
+- 本地状态只有 `localStorage["dsh.workspace-hud.v1"]`（位置与可见性）和 `localStorage["dsh.workspace-hud.cost.v1"]`（各工作区费用账本）。
 
 ## 已知边界
 
 - **账户消耗是本机口径**：Harness 不向客户端暴露云端账单用量，所以账户值是本机持久化会话的累计；没有工作目录的会话、以及 `session.list` 不返回的子代理会话不计入。
+- **工作区花费是估算**：按 60 秒轮询观察到的增量、用当时生效的价目表计价；会话中途换模型时没有分模型拆分，子代理会话不计入；内置单价是示例值，依赖这个数字前请先替换。
 - **缓存投影有轻微滞后**：从未打开过的旧会话使用投影缓存检查点（最多滞后 200 条事件或 5 秒）；打开中的会话始终实时。
 - **余额仅限桌面版**：没有 `remote.account` 的纯 Web 部署不会挂载本插件。
 - **账户客户端版本固定**为开发时的 `0.2.0-rc.2`；未来账户契约变化时余额可能显示不可用，其余功能不受影响。
@@ -114,6 +118,7 @@ dsh plugin --profile <profile> add github:LiuProMax/dsh-workspace-hud
 git clone https://github.com/LiuProMax/dsh-workspace-hud.git
 cd dsh-workspace-hud
 npm run check          # 校验 manifest、patch 与 client 注册
+npm test               # 价目表校验、错峰窗口、费用公式、校准过期
 node --check index.js
 node --check client.js
 ```

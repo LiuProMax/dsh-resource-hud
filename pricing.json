@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "currency": "CNY",
+  "unit": "per_million_tokens",
+  "version": "2026-11-15-demo",
+  "demo": true,
+  "note": "Sample rates for the cost estimate. Replace them with the current prices of your provider.",
+  "defaultModel": "deepseek-flash",
+  "models": {
+    "deepseek-flash": {
+      "input": 1,
+      "output": 4,
+      "cacheRead": 0.1,
+      "cacheWrite": 0
+    }
+  },
+  "windows": []
+}
